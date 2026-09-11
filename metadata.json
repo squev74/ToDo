@@ -1,0 +1,6 @@
+{
+  "name": "Gestionnaire de Tâches",
+  "description": "Application web autonome de gestion de tâches avec suivi de projets, drag-and-drop, gestion des statuts, blocages motivés et rapport journalier.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
