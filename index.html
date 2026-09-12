@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,10 +9,12 @@
     <meta property="og:description" content="Application web autonome de gestion de tâches avec suivi de projets, drag-and-drop, gestion des statuts, blocages motivés et rapport journalier." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <!-- Ajout facultatif pour éviter l'erreur 404 du favicon -->
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=" />
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="./src/main.tsx"></script>
+    <!--  Utiliser /src/main.tsx pour que Vite fasse la substitution au build -->
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
