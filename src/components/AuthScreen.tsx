@@ -12,8 +12,13 @@ import {
   ShieldCheck,
   Zap,
   ArrowRight,
+  Globe,
+  Copy,
+  Check,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth, getFriendlyAuthErrorMessage } from '../context/AuthContext';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 export const AuthScreen: React.FC = () => {
   const {
@@ -30,14 +35,27 @@ export const AuthScreen: React.FC = () => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isOperationNotAllowed, setIsOperationNotAllowed] = useState<boolean>(false);
+  const [isUnauthorizedDomain, setIsUnauthorizedDomain] = useState<boolean>(false);
+  const [domainCopied, setDomainCopied] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isGoogleSubmitting, setIsGoogleSubmitting] = useState<boolean>(false);
   const [isGuestSubmitting, setIsGuestSubmitting] = useState<boolean>(false);
+
+  const currentHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+
+  const handleCopyHostname = () => {
+    if (currentHostname) {
+      navigator.clipboard.writeText(currentHostname);
+      setDomainCopied(true);
+      setTimeout(() => setDomainCopied(false), 2500);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
     setIsOperationNotAllowed(false);
+    setIsUnauthorizedDomain(false);
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail || !password) {
@@ -65,6 +83,9 @@ export const AuthScreen: React.FC = () => {
       if (code === 'auth/operation-not-allowed') {
         setIsOperationNotAllowed(true);
         setErrorMsg(getFriendlyAuthErrorMessage(code));
+      } else if (code === 'auth/unauthorized-domain') {
+        setIsUnauthorizedDomain(true);
+        setErrorMsg(getFriendlyAuthErrorMessage(code));
       } else {
         const friendlyMessage = code
           ? getFriendlyAuthErrorMessage(code)
@@ -78,17 +99,23 @@ export const AuthScreen: React.FC = () => {
 
   const handleGoogleSignIn = async () => {
     setErrorMsg(null);
+    setIsOperationNotAllowed(false);
+    setIsUnauthorizedDomain(false);
     setIsGoogleSubmitting(true);
     try {
       await loginWithGoogle();
     } catch (err: unknown) {
       console.error('Erreur Google Sign-in:', err);
       const firebaseError = err as { code?: string };
-      if (firebaseError.code === 'auth/operation-not-allowed') {
+      const code = firebaseError.code || '';
+      if (code === 'auth/operation-not-allowed') {
         setIsOperationNotAllowed(true);
         setErrorMsg("L'authentification Google n'est pas encore activée dans la console Firebase. Vous pouvez utiliser l'accès direct.");
-      } else if (firebaseError.code !== 'auth/popup-closed-by-user') {
-        setErrorMsg(getFriendlyAuthErrorMessage(firebaseError.code || ''));
+      } else if (code === 'auth/unauthorized-domain') {
+        setIsUnauthorizedDomain(true);
+        setErrorMsg(getFriendlyAuthErrorMessage(code));
+      } else if (code !== 'auth/popup-closed-by-user') {
+        setErrorMsg(getFriendlyAuthErrorMessage(code));
       }
     } finally {
       setIsGoogleSubmitting(false);
@@ -201,6 +228,7 @@ export const AuthScreen: React.FC = () => {
                 setIsSignUp(false);
                 setErrorMsg(null);
                 setIsOperationNotAllowed(false);
+                setIsUnauthorizedDomain(false);
               }}
               className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
                 !isSignUp
@@ -217,6 +245,7 @@ export const AuthScreen: React.FC = () => {
                 setIsSignUp(true);
                 setErrorMsg(null);
                 setIsOperationNotAllowed(false);
+                setIsUnauthorizedDomain(false);
               }}
               className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
                 isSignUp
@@ -238,7 +267,71 @@ export const AuthScreen: React.FC = () => {
                 <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
                 <div className="flex-1 space-y-2">
                   <span className="font-medium leading-relaxed block">{errorMsg}</span>
-                  {isOperationNotAllowed && (
+
+                  {/* Guide spécifique pour auth/unauthorized-domain */}
+                  {isUnauthorizedDomain && (
+                    <div className="mt-2.5 pt-2.5 border-t border-rose-200/80 space-y-3">
+                      <div className="rounded-lg bg-white/90 p-2.5 border border-rose-100 text-slate-700 space-y-1.5">
+                        <div className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                          <Globe className="h-3.5 w-3.5 text-indigo-600" />
+                          <span>Domaine à autoriser dans Firebase :</span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-slate-50 rounded-md p-1.5 border border-slate-200">
+                          <code className="text-[11px] font-mono font-bold text-indigo-700 flex-1 truncate select-all">
+                            {currentHostname || 'votre-domaine.github.io'}
+                          </code>
+                          <button
+                            type="button"
+                            onClick={handleCopyHostname}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-700 shadow-2xs transition-colors shrink-0"
+                            title="Copier le domaine"
+                          >
+                            {domainCopied ? (
+                              <>
+                                <Check className="h-3 w-3 text-emerald-600" />
+                                <span className="text-emerald-700">Copié !</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-3 w-3 text-slate-500" />
+                                <span>Copier</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        <ol className="list-decimal list-inside text-[11px] text-slate-600 space-y-1 pt-1">
+                          <li>
+                            Ouvrez la{' '}
+                            <a
+                              href={`https://console.firebase.google.com/project/${firebaseConfig.projectId || 'mongestionnairetaches-379fb'}/authentication/settings`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-bold text-indigo-600 hover:underline inline-flex items-center gap-0.5"
+                            >
+                              Console Firebase (Paramètres Auth)
+                              <ExternalLink className="h-2.5 w-2.5" />
+                            </a>
+                          </li>
+                          <li>Allez dans l'onglet <strong>Domaines autorisés</strong></li>
+                          <li>Cliquez sur <strong>Ajouter un domaine</strong>, collez ce domaine et enregistrez.</li>
+                        </ol>
+                      </div>
+
+                      {/* Solution immédiate sans attente */}
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => loginWithLocalSession('invite@demo.fr')}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 font-bold text-[11px] shadow-xs transition-colors"
+                        >
+                          <Zap className="h-3.5 w-3.5 text-amber-400" />
+                          <span>Accéder immédiatement (Mode Démo)</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isOperationNotAllowed && !isUnauthorizedDomain && (
                     <div className="pt-1">
                       <button
                         type="button"

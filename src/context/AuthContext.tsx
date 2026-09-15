@@ -36,6 +36,8 @@ const LOCAL_USER_KEY = 'todolist_active_user_session';
 
 export function getFriendlyAuthErrorMessage(errorCode: string): string {
   switch (errorCode) {
+    case 'auth/unauthorized-domain':
+      return "Le domaine actuel de votre application n'est pas autorisé dans Firebase Authentication (Authentication > Paramètres > Domaines autorisés).";
     case 'auth/operation-not-allowed':
       return "Le fournisseur d'authentification Email/Mot de passe n'est pas encore activé dans votre console Firebase (Authentication > Sign-in method). Vous pouvez utiliser l'accès direct ci-dessous ou activer ce fournisseur dans Firebase.";
     case 'auth/invalid-credential':
