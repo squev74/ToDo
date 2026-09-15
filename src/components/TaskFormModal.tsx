@@ -11,7 +11,7 @@ interface TaskFormModalProps {
     description: string;
     projetId: string | null;
     statut: StatutTache;
-    dateEcheance?: string;
+    dateEcheance?: string | null;
     blockedReason?: string;
   }) => void;
   onClose: () => void;
@@ -70,7 +70,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       description: description.trim(),
       projetId: projetId || null,
       statut,
-      dateEcheance: dateEcheance || undefined,
+      dateEcheance: dateEcheance.trim() ? dateEcheance.trim() : null,
       blockedReason: statut === 'Blocked' ? blockedReason.trim() : undefined,
     });
     onClose();

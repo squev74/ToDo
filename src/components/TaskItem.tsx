@@ -21,15 +21,19 @@ interface TaskItemProps {
   task: Tache;
   project?: Projet;
   index: number;
-  onStatusChangeRequest: (task: Tache, newStatus: StatutTache) => void;
-  onEditTask: (task: Tache) => void;
-  onRequestDelete: (task: Tache) => void;
+  onStatusChangeRequest?: (task: Tache, newStatus: StatutTache) => void;
+  onStatusChange?: (task: Tache, newStatus: StatutTache) => void;
+  onEditTask?: (task: Tache) => void;
+  onEdit?: (task: Tache) => void;
+  onRequestDelete?: (task: Tache) => void;
+  onDelete?: (task: Tache) => void;
   onAddComment: (taskId: string, commentText: string) => void;
   onDragStart: (e: React.DragEvent, taskId: string) => void;
   onDragOver: (e: React.DragEvent, index: number) => void;
   onDragEnd: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent, index: number) => void;
   isDragOver: boolean;
+  isDragged?: boolean;
 }
 
 const STATUS_CONFIG: Record<
@@ -67,17 +71,26 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   project,
   index,
   onStatusChangeRequest,
+  onStatusChange,
   onEditTask,
+  onEdit,
   onRequestDelete,
+  onDelete,
   onAddComment,
   onDragStart,
   onDragOver,
   onDragEnd,
   onDrop,
   isDragOver,
+  isDragged,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [newCommentText, setNewCommentText] = useState('');
+
+  // Résolution sécurisée des handlers pour supporter onStatusChangeRequest et onStatusChange
+  const handleStatusChange = onStatusChangeRequest || onStatusChange || (() => {});
+  const handleEdit = onEditTask || onEdit || (() => {});
+  const handleDelete = onRequestDelete || onDelete || (() => {});
 
   const isDone = task.statut === 'Done';
   const isOverdue = isTaskOverdue(task);
@@ -85,9 +98,9 @@ export const TaskItem: React.FC<TaskItemProps> = ({
 
   const handleQuickDoneToggle = () => {
     if (isDone) {
-      onStatusChangeRequest(task, 'Open');
+      handleStatusChange(task, 'Open');
     } else {
-      onStatusChangeRequest(task, 'Done');
+      handleStatusChange(task, 'Done');
     }
   };
 
@@ -225,7 +238,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
                 id={`task-status-select-${task.id}`}
                 value={task.statut}
                 onChange={(e) =>
-                  onStatusChangeRequest(task, e.target.value as StatutTache)
+                  handleStatusChange(task, e.target.value as StatutTache)
                 }
                 className={`rounded-md border px-2 py-0.5 text-xs font-semibold cursor-pointer transition-colors focus:outline-hidden focus:ring-2 focus:ring-slate-300 ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
               >
@@ -283,7 +296,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           <button
             id={`task-edit-button-${task.id}`}
             type="button"
-            onClick={() => onEditTask(task)}
+            onClick={() => handleEdit(task)}
             className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
             title="Modifier la tâche"
           >
@@ -292,7 +305,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
           <button
             id={`task-delete-button-${task.id}`}
             type="button"
-            onClick={() => onRequestDelete(task)}
+            onClick={() => handleDelete(task)}
             className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
             title="Supprimer la tâche"
           >

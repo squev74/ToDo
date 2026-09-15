@@ -12,16 +12,36 @@ import {
   CheckCircle2,
   AlertCircle,
   FileText,
+  LogOut,
+  Cloud,
+  Loader2,
+  Zap,
+  User as UserIcon,
 } from 'lucide-react';
 import { Tache, Projet, StatutTache } from './types';
 import {
-  loadTasksFromStorage,
-  saveTasksToStorage,
-  loadProjectsFromStorage,
-  saveProjectsToStorage,
+  loadUserTasksFromStorage,
+  saveUserTasksToStorage,
+  loadUserProjectsFromStorage,
+  saveUserProjectsToStorage,
+  getDefaultProjects,
+  getDefaultTasks,
   exportDataAsJson,
   validateImportData,
 } from './utils/storage';
+import {
+  subscribeToUserData,
+  initializeUserInitialDataIfEmpty,
+  saveTaskToFirestore,
+  deleteTaskFromFirestore,
+  deleteMultipleTasksFromFirestore,
+  saveProjectToFirestore,
+  deleteProjectFromFirestore,
+  batchUpdateTasksInFirestore,
+  importDataToFirestore,
+} from './services/firestoreService';
+import { useAuth } from './context/AuthContext';
+import { AuthScreen } from './components/AuthScreen';
 import { TaskItem } from './components/TaskItem';
 import { TaskFormModal } from './components/TaskFormModal';
 import { BlockedReasonModal } from './components/BlockedReasonModal';
@@ -31,9 +51,12 @@ import { DailyReportPanel } from './components/DailyReportPanel';
 import { WelcomeBanner } from './components/WelcomeBanner';
 
 export default function App() {
-  // Données
-  const [tasks, setTasks] = useState<Tache[]>(() => loadTasksFromStorage());
-  const [projects, setProjects] = useState<Projet[]>(() => loadProjectsFromStorage());
+  const { user, loading: authLoading, logout } = useAuth();
+
+  // Données strictement isolées par utilisateur (vide à l'initialisation pour éviter tout mélange de données)
+  const [tasks, setTasks] = useState<Tache[]>([]);
+  const [projects, setProjects] = useState<Projet[]>([]);
+  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
 
   // Message de bienvenue pour les nouveaux utilisateurs
   const [showWelcome, setShowWelcome] = useState<boolean>(() => {
@@ -92,20 +115,111 @@ export default function App() {
   const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
-  // Sauvegarde automatique localStorage à chaque changement
-  useEffect(() => {
-    saveTasksToStorage(tasks);
-  }, [tasks]);
-
-  useEffect(() => {
-    saveProjectsToStorage(projects);
-  }, [projects]);
-
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ text, type });
     setTimeout(() => {
       setToastMessage((prev) => (prev?.text === text ? null : prev));
     }, 3500);
+  };
+
+  // Synchronisation en temps réel avec Firebase Firestore strictement isolée par compte utilisateur (Multi-tenant)
+  useEffect(() => {
+    if (!user) {
+      // Lorsque l'utilisateur est déconnecté, réinitialiser complètement l'état local (vide)
+      setTasks([]);
+      setProjects([]);
+      setIsCloudSyncing(false);
+      return;
+    }
+
+    const currentUserId = user.uid;
+
+    if (user.isLocalFallback) {
+      // Mode démo local sans backend Firebase Auth
+      const cachedTasks = loadUserTasksFromStorage(currentUserId);
+      const cachedProjects = loadUserProjectsFromStorage(currentUserId);
+      if (cachedTasks.length > 0 || cachedProjects.length > 0) {
+        setTasks(cachedTasks);
+        setProjects(cachedProjects);
+      } else {
+        const initialProj = getDefaultProjects(currentUserId);
+        const initialTasks = getDefaultTasks(currentUserId);
+        setProjects(initialProj);
+        setTasks(initialTasks);
+        saveUserProjectsToStorage(currentUserId, initialProj);
+        saveUserTasksToStorage(currentUserId, initialTasks);
+      }
+      setIsCloudSyncing(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsCloudSyncing(true);
+
+    // 1. Initialise l'espace Firestore personnel s'il est encore vierge (aucune donnée d'un autre utilisateur)
+    initializeUserInitialDataIfEmpty(currentUserId).catch((err) => {
+      console.warn('Initialisation Firestore:', err);
+    });
+
+    // 2. Abonnement en temps réel aux collections Cloud STRICTEMENT isolées de cet utilisateur
+    const unsubscribe = subscribeToUserData(
+      currentUserId,
+      (remoteTasks) => {
+        if (!isMounted) return;
+        setTasks(remoteTasks);
+        saveUserTasksToStorage(currentUserId, remoteTasks);
+        setIsCloudSyncing(false);
+      },
+      (remoteProjects) => {
+        if (!isMounted) return;
+        setProjects(remoteProjects);
+        saveUserProjectsToStorage(currentUserId, remoteProjects);
+        setIsCloudSyncing(false);
+      },
+      (syncErr) => {
+        console.error('Erreur synchronisation Firestore:', syncErr);
+        if (isMounted) {
+          setIsCloudSyncing(false);
+          // En cas d'indisponibilité réseau, restaurer les données en cache de cet utilisateur
+          const fallbackTasks = loadUserTasksFromStorage(currentUserId);
+          const fallbackProj = loadUserProjectsFromStorage(currentUserId);
+          if (fallbackTasks.length > 0) setTasks(fallbackTasks);
+          if (fallbackProj.length > 0) setProjects(fallbackProj);
+          showToast('Mode hors-ligne : données locales utilisateur actives.', 'error');
+        }
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [user]);
+
+  // Sauvegarde miroir dans le localStorage STRICTEMENT isolée par userId
+  useEffect(() => {
+    if (user?.uid && tasks.length > 0) {
+      saveUserTasksToStorage(user.uid, tasks);
+    }
+  }, [tasks, user]);
+
+  useEffect(() => {
+    if (user?.uid && projects.length > 0) {
+      saveUserProjectsToStorage(user.uid, projects);
+    }
+  }, [projects, user]);
+
+  // Déconnexion avec réinitialisation immédiate de l'état local (vide)
+  const handleLogout = async () => {
+    try {
+      setTasks([]);
+      setProjects([]);
+      await logout();
+      showToast('Vous avez été déconnecté.');
+    } catch (err) {
+      console.error('Erreur déconnexion:', err);
+      showToast('Erreur lors de la déconnexion.', 'error');
+    }
   };
 
   // Map des projets pour lookup instantané
@@ -116,11 +230,8 @@ export default function App() {
   }, [projects]);
 
   // Tri des tâches : les tâches Done vont automatiquement en bas de liste
-  // Les tâches actives conservent leur ordre relatif
   const sortedAndFilteredTasks = useMemo(() => {
-    // 1. Filtrage
     const filtered = tasks.filter((t) => {
-      // Recherche textuelle sur titre ou description
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchTitle = t.titre.toLowerCase().includes(query);
@@ -128,7 +239,6 @@ export default function App() {
         if (!matchTitle && !matchDesc) return false;
       }
 
-      // Filtre Projet
       if (selectedProjectFilter !== 'all') {
         if (selectedProjectFilter === 'none') {
           if (t.projetId !== null && t.projetId !== '') return false;
@@ -137,7 +247,6 @@ export default function App() {
         }
       }
 
-      // Filtre Statut
       if (selectedStatusFilter !== 'all' && t.statut !== selectedStatusFilter) {
         return false;
       }
@@ -145,11 +254,9 @@ export default function App() {
       return true;
     });
 
-    // 2. Règle : les 'Done' sont automatiquement en bas de liste
     const activeTasks = filtered.filter((t) => t.statut !== 'Done');
     const doneTasks = filtered.filter((t) => t.statut === 'Done');
 
-    // Tri par 'ordre' croissant
     activeTasks.sort((a, b) => a.ordre - b.ordre);
     doneTasks.sort((a, b) => a.ordre - b.ordre);
 
@@ -160,7 +267,6 @@ export default function App() {
   const handleStatusChangeRequest = (task: Tache, newStatus: StatutTache) => {
     if (task.statut === newStatus) return;
 
-    // Règle 4 : Passage vers 'Blocked' -> Modale obligatoire
     if (newStatus === 'Blocked') {
       setBlockedModalTask(task);
       return;
@@ -170,42 +276,44 @@ export default function App() {
   };
 
   const applyStatusChange = (taskId: string, newStatus: StatutTache, additionalComment?: string) => {
-    setTasks((prevTasks) => {
-      const target = prevTasks.find((t) => t.id === taskId);
-      if (!target) return prevTasks;
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
 
-      const updatedComments = [...(target.commentaires || [])];
-      if (additionalComment) {
-        updatedComments.push({
-          id: 'comm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-          texte: additionalComment,
-          date: new Date().toISOString(),
-        });
-      }
+    const updatedComments = [...(target.commentaires || [])];
+    if (additionalComment) {
+      updatedComments.push({
+        id: 'comm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        texte: additionalComment,
+        date: new Date().toISOString(),
+      });
+    }
 
-      // Horodatage ISO automatique quand statut passe à 'Done'
-      const isNowDone = newStatus === 'Done';
-      const dateRealisation = isNowDone ? new Date().toISOString() : null;
+    const isNowDone = newStatus === 'Done';
+    const dateRealisation = isNowDone ? new Date().toISOString() : null;
 
-      // Si la tâche passe à 'Done', on lui donne un ordre supérieur pour se caler en bas
-      let newOrdre = target.ordre;
-      if (isNowDone) {
-        const maxOrdre = prevTasks.reduce((max, t) => Math.max(max, t.ordre), 0);
-        newOrdre = maxOrdre + 1;
-      }
+    let newOrdre = target.ordre;
+    if (isNowDone) {
+      const maxOrdre = tasks.reduce((max, t) => Math.max(max, t.ordre), 0);
+      newOrdre = maxOrdre + 1;
+    }
 
-      return prevTasks.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              statut: newStatus,
-              dateRealisation,
-              commentaires: updatedComments,
-              ordre: newOrdre,
-            }
-          : t
-      );
-    });
+    const updatedTask: Tache = {
+      ...target,
+      userId: user?.uid || target.userId,
+      statut: newStatus,
+      dateRealisation,
+      dateModification: new Date().toISOString(),
+      commentaires: updatedComments,
+      ordre: newOrdre,
+    };
+
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
+
+    if (user && !user.isLocalFallback) {
+      saveTaskToFirestore(user.uid, updatedTask).catch((err) => {
+        console.error('Erreur Firestore statut:', err);
+      });
+    }
 
     if (newStatus === 'Done') {
       showToast('Tâche marquée comme terminée.');
@@ -223,22 +331,30 @@ export default function App() {
 
   // Ajout direct de commentaire à une tâche
   const handleAddCommentToTask = (taskId: string, commentText: string) => {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          const newComm = {
-            id: 'comm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-            texte: commentText,
-            date: new Date().toISOString(),
-          };
-          return {
-            ...t,
-            commentaires: [...(t.commentaires || []), newComm],
-          };
-        }
-        return t;
-      })
-    );
+    const target = tasks.find((t) => t.id === taskId);
+    if (!target) return;
+
+    const newComm = {
+      id: 'comm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      texte: commentText,
+      date: new Date().toISOString(),
+    };
+
+    const updatedTask: Tache = {
+      ...target,
+      userId: user?.uid || target.userId,
+      dateModification: new Date().toISOString(),
+      commentaires: [...(target.commentaires || []), newComm],
+    };
+
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
+
+    if (user && !user.isLocalFallback) {
+      saveTaskToFirestore(user.uid, updatedTask).catch((err) => {
+        console.error('Erreur Firestore ajout commentaire:', err);
+      });
+    }
+
     showToast('Commentaire ajouté à l’historique.');
   };
 
@@ -248,11 +364,10 @@ export default function App() {
     description: string;
     projetId: string | null;
     statut: StatutTache;
-    dateEcheance?: string;
+    dateEcheance?: string | null;
     blockedReason?: string;
   }) => {
     if (editingTask) {
-      // Édition
       const comments = [...(editingTask.commentaires || [])];
       if (taskData.blockedReason && taskData.statut === 'Blocked') {
         comments.push({
@@ -267,25 +382,29 @@ export default function App() {
         ? editingTask.dateRealisation || new Date().toISOString()
         : null;
 
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === editingTask.id
-            ? {
-                ...t,
-                titre: taskData.titre,
-                description: taskData.description,
-                projetId: taskData.projetId,
-                statut: taskData.statut,
-                dateEcheance: taskData.dateEcheance,
-                dateRealisation,
-                commentaires: comments,
-              }
-            : t
-        )
-      );
+      const updatedTask: Tache = {
+        ...editingTask,
+        userId: user?.uid || editingTask.userId,
+        titre: taskData.titre,
+        description: taskData.description || '',
+        projetId: taskData.projetId ?? null,
+        statut: taskData.statut,
+        dateEcheance: taskData.dateEcheance || null,
+        dateRealisation,
+        dateModification: new Date().toISOString(),
+        commentaires: comments,
+      };
+
+      setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? updatedTask : t)));
+
+      if (user && !user.isLocalFallback) {
+        saveTaskToFirestore(user.uid, updatedTask).catch((err) => {
+          console.error('Erreur Firestore mise à jour:', err);
+        });
+      }
+
       showToast('Tâche mise à jour avec succès.');
     } else {
-      // Création
       const maxOrdre = tasks.reduce((max, t) => Math.max(max, t.ordre), 0);
       const comments = [];
       if (taskData.blockedReason && taskData.statut === 'Blocked') {
@@ -298,17 +417,26 @@ export default function App() {
 
       const newTask: Tache = {
         id: 'task-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        userId: user?.uid,
         titre: taskData.titre,
-        description: taskData.description,
-        projetId: taskData.projetId,
+        description: taskData.description || '',
+        projetId: taskData.projetId ?? null,
         statut: taskData.statut,
-        dateEcheance: taskData.dateEcheance,
+        dateEcheance: taskData.dateEcheance || null,
         dateRealisation: taskData.statut === 'Done' ? new Date().toISOString() : null,
+        dateModification: new Date().toISOString(),
         ordre: maxOrdre + 1,
         commentaires: comments,
       };
 
       setTasks((prev) => [newTask, ...prev]);
+
+      if (user && !user.isLocalFallback) {
+        saveTaskToFirestore(user.uid, newTask).catch((err) => {
+          console.error('Erreur Firestore création:', err);
+        });
+      }
+
       showToast('Nouvelle tâche créée.');
     }
 
@@ -316,14 +444,19 @@ export default function App() {
     setEditingTask(null);
   };
 
-  // Demande de suppression de tâche (Règle 3 : Modale de confirmation obligatoire)
+  // Demande de suppression de tâche (Modale de confirmation)
   const handleRequestDeleteTask = (task: Tache) => {
     setConfirmModalConfig({
       isOpen: true,
       title: 'Supprimer cette tâche ?',
-      message: `Êtes-vous certain de vouloir supprimer définitivement la tâche « ${task.titre} » ? Son historique de commentaires sera également supprimé.`,
+      message: `Êtes-vous certain de vouloir supprimer définitivement la tâche « ${task.titre} » ? Son historique sera également supprimé.`,
       onConfirm: () => {
         setTasks((prev) => prev.filter((t) => t.id !== task.id));
+        if (user && !user.isLocalFallback) {
+          deleteTaskFromFirestore(user.uid, task.id).catch((err) => {
+            console.error('Erreur Firestore suppression:', err);
+          });
+        }
         setConfirmModalConfig((cfg) => ({ ...cfg, isOpen: false }));
         showToast('Tâche supprimée définitivement.');
       },
@@ -334,15 +467,23 @@ export default function App() {
   const handleAddProject = (nom: string, couleur: string) => {
     const newProj: Projet = {
       id: 'proj-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      userId: user?.uid,
       nom,
       couleur,
       dateCreation: new Date().toISOString(),
     };
     setProjects((prev) => [...prev, newProj]);
+
+    if (user && !user.isLocalFallback) {
+      saveProjectToFirestore(user.uid, newProj).catch((err) => {
+        console.error('Erreur Firestore projet:', err);
+      });
+    }
+
     showToast(`Projet « ${nom} » créé.`);
   };
 
-  // Projets : Demande de suppression (Règle 3 : Modale de confirmation obligatoire)
+  // Projets : Demande de suppression (Modale de confirmation)
   const handleRequestDeleteProject = (project: Projet) => {
     const count = tasks.filter((t) => t.projetId === project.id).length;
     setConfirmModalConfig({
@@ -354,11 +495,17 @@ export default function App() {
           : 'Aucune tâche n’y est associée.'
       }`,
       onConfirm: () => {
-        // Supprime le projet et dissocie les tâches
         setProjects((prev) => prev.filter((p) => p.id !== project.id));
         setTasks((prev) =>
           prev.map((t) => (t.projetId === project.id ? { ...t, projetId: null } : t))
         );
+
+        if (user && !user.isLocalFallback) {
+          deleteProjectFromFirestore(user.uid, project.id, tasks).catch((err) => {
+            console.error('Erreur Firestore suppression projet:', err);
+          });
+        }
+
         setConfirmModalConfig((cfg) => ({ ...cfg, isOpen: false }));
         showToast(`Projet « ${project.nom} » supprimé.`);
       },
@@ -378,6 +525,13 @@ export default function App() {
       message: "Cette action va retirer les tâches de démonstration pour vous laisser un espace de travail vierge. Vos éventuelles nouvelles tâches seront conservées.",
       onConfirm: () => {
         setTasks((prev) => prev.filter((t) => !exampleTaskIds.includes(t.id)));
+
+        if (user && !user.isLocalFallback) {
+          deleteMultipleTasksFromFirestore(user.uid, exampleTaskIds).catch((err) => {
+            console.error('Erreur Firestore suppression exemples:', err);
+          });
+        }
+
         setConfirmModalConfig((cfg) => ({ ...cfg, isOpen: false }));
         showToast("Tâches d'exemples supprimées.");
       },
@@ -408,7 +562,6 @@ export default function App() {
     e.preventDefault();
     if (!draggedTaskId) return;
 
-    // Récupérer la tâche déplacée
     const currentList = [...sortedAndFilteredTasks];
     const sourceIndex = currentList.findIndex((t) => t.id === draggedTaskId);
     if (sourceIndex === -1 || sourceIndex === targetIndex) {
@@ -417,24 +570,28 @@ export default function App() {
       return;
     }
 
-    // Réordonner la liste affichée
     const [movedTask] = currentList.splice(sourceIndex, 1);
     currentList.splice(targetIndex, 0, movedTask);
 
-    // Mettre à jour l'ordre de chaque tâche
     const updatedMap = new Map<string, number>();
     currentList.forEach((task, idx) => {
       updatedMap.set(task.id, idx + 1);
     });
 
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (updatedMap.has(t.id)) {
-          return { ...t, ordre: updatedMap.get(t.id)! };
-        }
-        return t;
-      })
-    );
+    const updatedTasks = tasks.map((t) => {
+      if (updatedMap.has(t.id)) {
+        return { ...t, ordre: updatedMap.get(t.id)! };
+      }
+      return t;
+    });
+
+    setTasks(updatedTasks);
+
+    if (user && !user.isLocalFallback) {
+      batchUpdateTasksInFirestore(user.uid, updatedTasks).catch((err) => {
+        console.error('Erreur Firestore réordonnancement:', err);
+      });
+    }
 
     setDraggedTaskId(null);
     setDragOverIndex(null);
@@ -443,7 +600,7 @@ export default function App() {
 
   // Import / Export JSON
   const handleExportJson = () => {
-    exportDataAsJson(tasks, projects);
+    exportDataAsJson(tasks, projects, user?.uid);
     showToast('Fichier JSON exporté avec succès.');
   };
 
@@ -458,44 +615,76 @@ export default function App() {
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const content = event.target?.result as string;
-        const parsed = JSON.parse(content);
-        const validation = validateImportData(parsed);
+        const parsed = JSON.parse(event.target?.result as string);
+        const validated = validateImportData(parsed, user?.uid);
 
-        if (!validation.valid || !validation.taches || !validation.projets) {
-          showToast(validation.error || 'Fichier JSON non conforme.', 'error');
+        if (!validated.valid || !validated.taches || !validated.projets) {
+          showToast(validated.error || 'Erreur de format du fichier JSON.', 'error');
           return;
         }
 
-        // Confirmation avant écrasement
+        const newTasks = validated.taches;
+        const newProjects = validated.projets;
+
         setConfirmModalConfig({
           isOpen: true,
-          title: 'Importer les données ?',
-          message: `Le fichier contient ${validation.taches.length} tâche(s) et ${validation.projets.length} projet(s). Cette action remplacera vos données actuelles.`,
+          title: 'Importer les données JSON ?',
+          message: `Ce fichier contient ${newTasks.length} tâche(s) et ${newProjects.length} projet(s). Voulez-vous remplacer votre contenu actuel par ces données et les synchroniser dans Firestore ?`,
           onConfirm: () => {
-            setTasks(validation.taches!);
-            setProjects(validation.projets!);
+            setProjects(newProjects);
+            setTasks(newTasks);
+
+            if (user && !user.isLocalFallback) {
+              importDataToFirestore(user.uid, newProjects, newTasks).catch((err) => {
+                console.error('Erreur Firestore import:', err);
+              });
+            }
+
             setConfirmModalConfig((cfg) => ({ ...cfg, isOpen: false }));
-            showToast('Données importées avec succès.');
+            showToast('Données importées et synchronisées dans le cloud.');
           },
         });
-      } catch (err) {
-        showToast('Impossible de lire le fichier JSON sélectionné.', 'error');
-        console.error(err);
+      } catch {
+        showToast('Fichier JSON illisible ou corrompu.', 'error');
       } finally {
-        if (fileInputRef.current) fileInputRef.current.value = '';
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
     };
     reader.readAsText(file);
   };
 
-  const resetFilters = () => {
-    setSearchQuery('');
-    setSelectedProjectFilter('all');
-    setSelectedStatusFilter('all');
-  };
+  // Si l'état d'authentification est en cours de vérification
+  if (authLoading) {
+    return (
+      <div id="auth-loading-screen" className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200 mb-4 animate-pulse">
+          <ListTodo className="h-6 w-6" />
+        </div>
+        <div className="flex items-center gap-2 text-slate-700 text-xs font-semibold">
+          <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+          <span>Connexion à Firebase en cours...</span>
+        </div>
+      </div>
+    );
+  }
 
-  const isAnyFilterActive =
+  // Si l'utilisateur n'est pas connecté, afficher l'écran d'authentification
+  if (!user) {
+    return <AuthScreen />;
+  }
+
+  // Nombre de tâches en retard (sauf Done)
+  const overdueCount = tasks.filter((t) => {
+    if (t.statut === 'Done') return false;
+    if (!t.dateEcheance) return false;
+    const today = new Date().toISOString().split('T')[0];
+    return t.dateEcheance < today;
+  }).length;
+
+  // Filtres actifs ?
+  const hasActiveFilters =
     searchQuery.trim() !== '' ||
     selectedProjectFilter !== 'all' ||
     selectedStatusFilter !== 'all';
@@ -543,9 +732,23 @@ export default function App() {
                 <h1 className="text-lg font-bold tracking-tight text-slate-900">
                   Gestionnaire de Tâches
                 </h1>
-                <p className="text-xs text-slate-500">
-                  {tasks.length} tâche{tasks.length > 1 ? 's' : ''} • {projects.length} projet{projects.length > 1 ? 's' : ''}
-                </p>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <span>
+                    {tasks.length} tâche{tasks.length > 1 ? 's' : ''} • {projects.length} projet{projects.length > 1 ? 's' : ''}
+                  </span>
+                  <span className="text-slate-300">•</span>
+                  {user.isLocalFallback ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200">
+                      <Zap className="h-3 w-3 text-amber-500" />
+                      <span>Mode Démo / Local</span>
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                      <Cloud className="h-3 w-3" />
+                      <span>Cloud Firestore</span>
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -566,7 +769,7 @@ export default function App() {
                 </span>
               </button>
 
-              {/* Boutons discrets Exporter / Importer JSON */}
+              {/* Boutons Exporter / Importer JSON */}
               <div className="flex items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-2xs">
                 <button
                   id="export-json-button"
@@ -604,6 +807,29 @@ export default function App() {
                 <Plus className="h-4 w-4 stroke-[2.5]" />
                 <span>Nouvelle tâche</span>
               </button>
+
+              {/* Compte Utilisateur & Déconnexion */}
+              <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-slate-200">
+                <div className="hidden lg:flex flex-col text-right">
+                  <span className="text-[11px] font-semibold text-slate-700 truncate max-w-[130px]" title={user.email || ''}>
+                    {user.email}
+                  </span>
+                  <span className="text-[10px] text-slate-400">
+                    {user.isLocalFallback ? 'Session Démo' : 'Connecté'}
+                  </span>
+                </div>
+
+                <button
+                  id="logout-btn"
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-colors shadow-2xs"
+                  title="Se déconnecter"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Déconnexion</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -635,7 +861,7 @@ export default function App() {
                 }`}
               >
                 <CalendarCheck className="h-3.5 w-3.5" />
-                <span>Rapport Journalier</span>
+                <span>Rapport d&apos;Activité & Suivi</span>
               </button>
             </div>
           </div>
@@ -676,33 +902,38 @@ export default function App() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Rechercher par titre ou description..."
-                    className="w-full rounded-lg border border-slate-300 bg-slate-50/50 pl-9 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+                    placeholder="Rechercher par mot-clé dans les tâches..."
+                    className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
 
-                {/* Filtre déroulant par Projet */}
+                {/* Filtre par Projet */}
                 <div className="md:col-span-3">
                   <label htmlFor="filter-project-select" className="sr-only">
                     Filtrer par projet
                   </label>
-                  <select
-                    id="filter-project-select"
-                    value={selectedProjectFilter}
-                    onChange={(e) => setSelectedProjectFilter(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
-                  >
-                    <option value="all">Tous les projets</option>
-                    <option value="none">Sans projet assigné</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.nom}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      id="filter-project-select"
+                      value={selectedProjectFilter}
+                      onChange={(e) => setSelectedProjectFilter(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+                    >
+                      <option value="all">Tous les projets ({tasks.length})</option>
+                      <option value="none">Sans projet assigné</option>
+                      {projects.map((proj) => {
+                        const count = tasks.filter((t) => t.projetId === proj.id).length;
+                        return (
+                          <option key={proj.id} value={proj.id}>
+                            {proj.nom} ({count})
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
                 </div>
 
-                {/* Filtre déroulant par Statut */}
+                {/* Filtre par Statut */}
                 <div className="md:col-span-3">
                   <label htmlFor="filter-status-select" className="sr-only">
                     Filtrer par statut
@@ -721,71 +952,86 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* Réinitialiser les filtres */}
+                {/* Bouton de réinitialisation */}
                 <div className="md:col-span-1 flex justify-end">
-                  {isAnyFilterActive && (
+                  {hasActiveFilters ? (
                     <button
                       id="reset-filters-btn"
                       type="button"
-                      onClick={resetFilters}
-                      className="inline-flex items-center gap-1 rounded-lg border border-slate-200 p-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setSelectedProjectFilter('all');
+                        setSelectedStatusFilter('all');
+                      }}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
                       title="Réinitialiser les filtres"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
                     </button>
+                  ) : (
+                    <div className="h-8 w-8 flex items-center justify-center text-slate-300">
+                      <Filter className="h-3.5 w-3.5" />
+                    </div>
                   )}
                 </div>
               </div>
 
-              {/* Indicateur de résultats */}
-              <div className="mt-3 flex items-center justify-between text-xs text-slate-500 border-t border-slate-100 pt-2.5">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-3.5 w-3.5 text-slate-400" />
+              {/* Indicateur de tâches en retard */}
+              {overdueCount > 0 && (
+                <div className="mt-3 flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 border border-rose-100">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
                   <span>
-                    Affichage de <strong className="text-slate-800">{sortedAndFilteredTasks.length}</strong> tâche{sortedAndFilteredTasks.length > 1 ? 's' : ''} sur {tasks.length}
+                    Attention : {overdueCount} tâche{overdueCount > 1 ? 's ont' : ' a'} dépassé leur date d&apos;échéance.
                   </span>
                 </div>
-                <span className="text-[11px] text-slate-400 hidden sm:inline">
-                  Glissez-déposez les cartes pour réordonner • Les tâches terminées descendent automatiquement
-                </span>
-              </div>
+              )}
             </div>
 
-            {/* LISTE VERTICALE GLOBALE DES TÂCHES */}
-            <div id="tasks-vertical-list" className="space-y-2.5">
+            {/* LISTE DES TÂCHES */}
+            <div id="tasks-list-container" className="space-y-2.5">
               {sortedAndFilteredTasks.length === 0 ? (
                 <div
                   id="empty-tasks-placeholder"
                   className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center"
                 >
-                  <FileText className="mx-auto h-10 w-10 text-slate-300 mb-3" />
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    Aucune tâche correspondante
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 mb-3">
+                    <FileText className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    {hasActiveFilters ? 'Aucune tâche ne correspond à vos filtres' : 'Votre to-do list est vide'}
                   </h3>
                   <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
-                    {isAnyFilterActive
-                      ? 'Modifiez ou réinitialisez vos critères de recherche pour afficher les tâches.'
-                      : 'Votre liste est vide. Créez votre première tâche pour commencer.'}
+                    {hasActiveFilters
+                      ? 'Essayez d’élargir vos termes de recherche ou de réinitialiser les filtres de statut et de projet.'
+                      : 'Créez votre première tâche pour commencer à organiser vos activités.'}
                   </p>
-                  {isAnyFilterActive ? (
-                    <button
-                      type="button"
-                      onClick={resetFilters}
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                      Réinitialiser les filtres
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsTaskModalOpen(true)}
-                      className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Créer une tâche
-                    </button>
-                  )}
+                  <div className="mt-4 flex justify-center gap-2">
+                    {hasActiveFilters ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setSelectedProjectFilter('all');
+                          setSelectedStatusFilter('all');
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Effacer les filtres
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingTask(null);
+                          setIsTaskModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Créer une tâche</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 sortedAndFilteredTasks.map((task, index) => {
@@ -797,17 +1043,24 @@ export default function App() {
                       project={project}
                       index={index}
                       onStatusChangeRequest={handleStatusChangeRequest}
+                      onStatusChange={handleStatusChangeRequest}
                       onEditTask={(t) => {
                         setEditingTask(t);
                         setIsTaskModalOpen(true);
                       }}
+                      onEdit={(t) => {
+                        setEditingTask(t);
+                        setIsTaskModalOpen(true);
+                      }}
                       onRequestDelete={handleRequestDeleteTask}
+                      onDelete={handleRequestDeleteTask}
                       onAddComment={handleAddCommentToTask}
                       onDragStart={handleDragStart}
                       onDragOver={handleDragOver}
                       onDragEnd={handleDragEnd}
                       onDrop={handleDrop}
-                      isDragOver={dragOverIndex === index && draggedTaskId !== task.id}
+                      isDragged={draggedTaskId === task.id}
+                      isDragOver={dragOverIndex === index}
                     />
                   );
                 })
@@ -823,7 +1076,7 @@ export default function App() {
       {/* FOOTER DISCRET */}
       <footer id="main-footer" className="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
         <div className="mx-auto max-w-6xl px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>Application autonome de gestion de tâches • Données sauvegardées en temps réel dans votre navigateur (localStorage)</p>
+          <p>Données synchronisées en temps réel via Firebase Firestore • Accès multi-appareils</p>
           {!showWelcome && (
             <button
               id="reopen-welcome-banner-btn"

@@ -1,6 +1,6 @@
 {
   "name": "Gestionnaire de Tâches",
-  "description": "Application web autonome de gestion de tâches avec suivi de projets, drag-and-drop, gestion des statuts, blocages motivés et rapport journalier.",
+  "description": "Application web de gestion de tâches multi-appareils avec synchronisation temps réel Firebase Firestore, authentification sécurisée, suivi de projets, drag-and-drop et rapport d'activité.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

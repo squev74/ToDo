@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Project",
+      "description": "Projet de regroupement de tâches",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nom": { "type": "string" },
+        "couleur": { "type": "string" },
+        "dateCreation": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "nom", "couleur", "dateCreation"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Tâche avec statut, projet, priorités et commentaires",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "titre": { "type": "string" },
+        "description": { "type": "string" },
+        "statut": { "type": "string" },
+        "projetId": { "type": "string" },
+        "dateEcheance": { "type": "string" },
+        "dateRealisation": { "type": "string" },
+        "dateModification": { "type": "string" },
+        "ordre": { "type": "number" },
+        "userId": { "type": "string" },
+        "commentaires": { "type": "array" }
+      },
+      "required": ["id", "titre", "statut", "ordre"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Projets de l'utilisateur"
+    },
+    "/users/{userId}/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Tâches de l'utilisateur"
+    }
+  }
+}
