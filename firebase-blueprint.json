@@ -1,21 +1,37 @@
 {
   "entities": {
+    "Space": {
+      "title": "Space",
+      "description": "Espace de travail (Workspace) pour cloisonner tâches et projets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nom": { "type": "string" },
+        "couleur": { "type": "string" },
+        "icone": { "type": "string" },
+        "description": { "type": "string" },
+        "dateCreation": { "type": "string" },
+        "userId": { "type": "string" }
+      },
+      "required": ["id", "nom", "couleur", "dateCreation"]
+    },
     "Project": {
       "title": "Project",
-      "description": "Projet de regroupement de tâches",
+      "description": "Projet de regroupement de tâches dans un espace",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "nom": { "type": "string" },
         "couleur": { "type": "string" },
         "dateCreation": { "type": "string" },
-        "userId": { "type": "string" }
+        "userId": { "type": "string" },
+        "spaceId": { "type": "string" }
       },
-      "required": ["id", "nom", "couleur", "dateCreation"]
+      "required": ["id", "nom", "couleur", "dateCreation", "spaceId"]
     },
     "Task": {
       "title": "Task",
-      "description": "Tâche avec statut, projet, priorités et commentaires",
+      "description": "Tâche avec statut, projet, priorités, espace et commentaires",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
@@ -23,6 +39,7 @@
         "description": { "type": "string" },
         "statut": { "type": "string" },
         "projetId": { "type": "string" },
+        "spaceId": { "type": "string" },
         "dateEcheance": { "type": "string" },
         "dateRealisation": { "type": "string" },
         "dateModification": { "type": "string" },
@@ -30,10 +47,14 @@
         "userId": { "type": "string" },
         "commentaires": { "type": "array" }
       },
-      "required": ["id", "titre", "statut", "ordre"]
+      "required": ["id", "titre", "statut", "ordre", "spaceId"]
     }
   },
   "firestore": {
+    "/users/{userId}/spaces/{spaceId}": {
+      "schema": "Space",
+      "description": "Espaces de travail de l'utilisateur"
+    },
     "/users/{userId}/projects/{projectId}": {
       "schema": "Project",
       "description": "Projets de l'utilisateur"

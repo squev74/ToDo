@@ -16,22 +16,29 @@ import {
   Cloud,
   Loader2,
   Zap,
-  User as UserIcon,
 } from 'lucide-react';
-import { Tache, Projet, StatutTache } from './types';
+import { Tache, Projet, Espace, StatutTache } from './types';
 import {
+  DEFAULT_SPACE_ID,
+  getDefaultSpaces,
+  getDefaultProjects,
+  getDefaultTasks,
+  loadUserSpacesFromStorage,
+  saveUserSpacesToStorage,
+  loadActiveSpaceId,
+  saveActiveSpaceId,
   loadUserTasksFromStorage,
   saveUserTasksToStorage,
   loadUserProjectsFromStorage,
   saveUserProjectsToStorage,
-  getDefaultProjects,
-  getDefaultTasks,
   exportDataAsJson,
   validateImportData,
 } from './utils/storage';
 import {
   subscribeToUserData,
   initializeUserInitialDataIfEmpty,
+  saveSpaceToFirestore,
+  deleteSpaceFromFirestore,
   saveTaskToFirestore,
   deleteTaskFromFirestore,
   deleteMultipleTasksFromFirestore,
@@ -49,14 +56,18 @@ import { ProjectManagerModal } from './components/ProjectManagerModal';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { DailyReportPanel } from './components/DailyReportPanel';
 import { WelcomeBanner } from './components/WelcomeBanner';
+import { WorkspaceSelector } from './components/WorkspaceSelector';
+import { WorkspaceManagerModal } from './components/WorkspaceManagerModal';
 
 export default function App() {
   const { user, loading: authLoading, logout } = useAuth();
 
-  // Données strictement isolées par utilisateur (vide à l'initialisation pour éviter tout mélange de données)
+  // Données strictement isolées par utilisateur
+  const [spaces, setSpaces] = useState<Espace[]>(() => getDefaultSpaces());
+  const [activeSpaceId, setActiveSpaceId] = useState<string>(DEFAULT_SPACE_ID);
   const [tasks, setTasks] = useState<Tache[]>([]);
   const [projects, setProjects] = useState<Projet[]>([]);
-  const [isCloudSyncing, setIsCloudSyncing] = useState<boolean>(false);
+  const [, setIsCloudSyncing] = useState<boolean>(false);
 
   // Message de bienvenue pour les nouveaux utilisateurs
   const [showWelcome, setShowWelcome] = useState<boolean>(() => {
@@ -85,16 +96,19 @@ export default function App() {
   const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
 
-  // Modales
+  // Modales Tâche et Projet
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Tache | null>(null);
-
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+
+  // Modale Espaces de travail (Workspaces)
+  const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState(false);
+  const [workspaceModalInitialMode, setWorkspaceModalInitialMode] = useState<'list' | 'create'>('list');
 
   // Modale Motif Bloqué (Règle 4)
   const [blockedModalTask, setBlockedModalTask] = useState<Tache | null>(null);
 
-  // Modale de confirmation de suppression
+  // Modale de confirmation réutilisable
   const [confirmModalConfig, setConfirmModalConfig] = useState<{
     isOpen: boolean;
     title: string;
@@ -122,10 +136,12 @@ export default function App() {
     }, 3500);
   };
 
-  // Synchronisation en temps réel avec Firebase Firestore strictement isolée par compte utilisateur (Multi-tenant)
+  // Synchronisation en temps réel avec Firebase Firestore strictement isolée par compte utilisateur
   useEffect(() => {
     if (!user) {
-      // Lorsque l'utilisateur est déconnecté, réinitialiser complètement l'état local (vide)
+      // Déconnecté : vider l'état
+      setSpaces(getDefaultSpaces());
+      setActiveSpaceId(DEFAULT_SPACE_ID);
       setTasks([]);
       setProjects([]);
       setIsCloudSyncing(false);
@@ -136,8 +152,18 @@ export default function App() {
 
     if (user.isLocalFallback) {
       // Mode démo local sans backend Firebase Auth
+      const cachedSpaces = loadUserSpacesFromStorage(currentUserId);
       const cachedTasks = loadUserTasksFromStorage(currentUserId);
       const cachedProjects = loadUserProjectsFromStorage(currentUserId);
+      const storedActiveSpaceId = loadActiveSpaceId(currentUserId);
+
+      setSpaces(cachedSpaces.length > 0 ? cachedSpaces : getDefaultSpaces(currentUserId));
+      setActiveSpaceId(
+        storedActiveSpaceId && cachedSpaces.some((s) => s.id === storedActiveSpaceId)
+          ? storedActiveSpaceId
+          : cachedSpaces[0]?.id || DEFAULT_SPACE_ID
+      );
+
       if (cachedTasks.length > 0 || cachedProjects.length > 0) {
         setTasks(cachedTasks);
         setProjects(cachedProjects);
@@ -156,7 +182,24 @@ export default function App() {
     let isMounted = true;
     setIsCloudSyncing(true);
 
-    // 1. Initialise l'espace Firestore personnel s'il est encore vierge (aucune donnée d'un autre utilisateur)
+    // Initialisation immédiate avec le cache local pour réactivité instantanée
+    const localCachedSpaces = loadUserSpacesFromStorage(currentUserId);
+    const localCachedTasks = loadUserTasksFromStorage(currentUserId);
+    const localCachedProj = loadUserProjectsFromStorage(currentUserId);
+    const localActiveSpaceId = loadActiveSpaceId(currentUserId);
+
+    if (localCachedSpaces.length > 0) {
+      setSpaces(localCachedSpaces);
+      if (localActiveSpaceId && localCachedSpaces.some((s) => s.id === localActiveSpaceId)) {
+        setActiveSpaceId(localActiveSpaceId);
+      } else {
+        setActiveSpaceId(localCachedSpaces[0].id);
+      }
+    }
+    if (localCachedTasks.length > 0) setTasks(localCachedTasks);
+    if (localCachedProj.length > 0) setProjects(localCachedProj);
+
+    // 1. Initialise l'espace Firestore personnel s'il est vierge
     initializeUserInitialDataIfEmpty(currentUserId).catch((err) => {
       console.warn('Initialisation Firestore:', err);
     });
@@ -176,16 +219,28 @@ export default function App() {
         saveUserProjectsToStorage(currentUserId, remoteProjects);
         setIsCloudSyncing(false);
       },
+      (remoteSpaces) => {
+        if (!isMounted) return;
+        if (remoteSpaces && remoteSpaces.length > 0) {
+          setSpaces(remoteSpaces);
+          saveUserSpacesToStorage(currentUserId, remoteSpaces);
+          setActiveSpaceId((prevId) => {
+            if (remoteSpaces.some((s) => s.id === prevId)) return prevId;
+            return remoteSpaces[0].id;
+          });
+        }
+      },
       (syncErr) => {
         console.error('Erreur synchronisation Firestore:', syncErr);
         if (isMounted) {
           setIsCloudSyncing(false);
-          // En cas d'indisponibilité réseau, restaurer les données en cache de cet utilisateur
+          const fallbackSpaces = loadUserSpacesFromStorage(currentUserId);
           const fallbackTasks = loadUserTasksFromStorage(currentUserId);
           const fallbackProj = loadUserProjectsFromStorage(currentUserId);
+          if (fallbackSpaces.length > 0) setSpaces(fallbackSpaces);
           if (fallbackTasks.length > 0) setTasks(fallbackTasks);
           if (fallbackProj.length > 0) setProjects(fallbackProj);
-          showToast('Mode hors-ligne : données locales utilisateur actives.', 'error');
+          showToast('Mode hors-ligne : données locales actives.', 'error');
         }
       }
     );
@@ -196,7 +251,13 @@ export default function App() {
     };
   }, [user]);
 
-  // Sauvegarde miroir dans le localStorage STRICTEMENT isolée par userId
+  // Sauvegardes miroir dans le localStorage
+  useEffect(() => {
+    if (user?.uid && spaces.length > 0) {
+      saveUserSpacesToStorage(user.uid, spaces);
+    }
+  }, [spaces, user]);
+
   useEffect(() => {
     if (user?.uid && tasks.length > 0) {
       saveUserTasksToStorage(user.uid, tasks);
@@ -209,9 +270,33 @@ export default function App() {
     }
   }, [projects, user]);
 
-  // Déconnexion avec réinitialisation immédiate de l'état local (vide)
+  // Espace de travail actif courant
+  const currentSpace = useMemo(() => {
+    const found = spaces.find((s) => s.id === activeSpaceId);
+    return found || spaces[0] || getDefaultSpaces()[0];
+  }, [spaces, activeSpaceId]);
+
+  // Données strictement cloisonnées pour l'espace actif (Workspaces étanches)
+  const currentSpaceTasks = useMemo(() => {
+    return tasks.filter((t) => (t.spaceId || DEFAULT_SPACE_ID) === currentSpace.id);
+  }, [tasks, currentSpace.id]);
+
+  const currentSpaceProjects = useMemo(() => {
+    return projects.filter((p) => (p.spaceId || DEFAULT_SPACE_ID) === currentSpace.id);
+  }, [projects, currentSpace.id]);
+
+  // Map des projets de l'espace actif pour lookup instantané
+  const projectsMap = useMemo(() => {
+    const map = new Map<string, Projet>();
+    currentSpaceProjects.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [currentSpaceProjects]);
+
+  // Déconnexion
   const handleLogout = async () => {
     try {
+      setSpaces(getDefaultSpaces());
+      setActiveSpaceId(DEFAULT_SPACE_ID);
       setTasks([]);
       setProjects([]);
       await logout();
@@ -222,16 +307,128 @@ export default function App() {
     }
   };
 
-  // Map des projets pour lookup instantané
-  const projectsMap = useMemo(() => {
-    const map = new Map<string, Projet>();
-    projects.forEach((p) => map.set(p.id, p));
-    return map;
-  }, [projects]);
+  // Basculer d'espace de travail
+  const handleSelectSpace = (spaceId: string) => {
+    setActiveSpaceId(spaceId);
+    if (user?.uid) {
+      saveActiveSpaceId(user.uid, spaceId);
+    }
+    // Réinitialisation des filtres locaux lors d'un changement d'espace pour un affichage propre
+    setSelectedProjectFilter('all');
+    setSelectedStatusFilter('all');
+    setSearchQuery('');
+    const targetSpace = spaces.find((s) => s.id === spaceId);
+    if (targetSpace) {
+      showToast(`Espace « ${targetSpace.nom} » activé.`);
+    }
+  };
 
-  // Tri des tâches : les tâches Done vont automatiquement en bas de liste
+  // Enregistrer (Créer ou Modifier) un espace de travail
+  const handleSaveWorkspace = (spaceData: {
+    id?: string;
+    nom: string;
+    couleur: string;
+    icone: string;
+    description?: string;
+  }) => {
+    if (spaceData.id) {
+      // Modification d'un espace existant
+      const updatedSpace: Espace = {
+        id: spaceData.id,
+        userId: user?.uid,
+        nom: spaceData.nom,
+        couleur: spaceData.couleur,
+        icone: spaceData.icone,
+        description: spaceData.description,
+        dateCreation:
+          spaces.find((s) => s.id === spaceData.id)?.dateCreation || new Date().toISOString(),
+      };
+
+      setSpaces((prev) => prev.map((s) => (s.id === spaceData.id ? updatedSpace : s)));
+
+      if (user && !user.isLocalFallback) {
+        saveSpaceToFirestore(user.uid, updatedSpace).catch((err) => {
+          console.error('Erreur Firestore mise à jour espace:', err);
+        });
+      }
+
+      showToast(`Espace « ${spaceData.nom} » mis à jour.`);
+    } else {
+      // Création d'un nouvel espace
+      const newSpaceId = 'space-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
+      const newSpace: Espace = {
+        id: newSpaceId,
+        userId: user?.uid,
+        nom: spaceData.nom,
+        couleur: spaceData.couleur,
+        icone: spaceData.icone,
+        description: spaceData.description,
+        dateCreation: new Date().toISOString(),
+      };
+
+      setSpaces((prev) => [...prev, newSpace]);
+      setActiveSpaceId(newSpaceId);
+      if (user?.uid) {
+        saveActiveSpaceId(user.uid, newSpaceId);
+      }
+
+      if (user && !user.isLocalFallback) {
+        saveSpaceToFirestore(user.uid, newSpace).catch((err) => {
+          console.error('Erreur Firestore création espace:', err);
+        });
+      }
+
+      showToast(`Espace « ${spaceData.nom} » créé et activé.`);
+    }
+  };
+
+  // Demande de suppression d'un espace de travail (avec confirmation stricte)
+  const handleRequestDeleteWorkspace = (spaceToDelete: Espace) => {
+    if (spaces.length <= 1) {
+      showToast('Impossible de supprimer le dernier espace de travail restant.', 'error');
+      return;
+    }
+
+    const taskCount = tasks.filter((t) => t.spaceId === spaceToDelete.id).length;
+    const projectCount = projects.filter((p) => p.spaceId === spaceToDelete.id).length;
+
+    setConfirmModalConfig({
+      isOpen: true,
+      title: `Supprimer l'espace « ${spaceToDelete.nom} » ?`,
+      message: `Attention : cette action est irréversible. L'espace sera supprimé ainsi que la totalité de ses ${projectCount} projet(s) et ${taskCount} tâche(s) associés.`,
+      onConfirm: () => {
+        // Supprimer localement
+        const remainingSpaces = spaces.filter((s) => s.id !== spaceToDelete.id);
+        setSpaces(remainingSpaces);
+        setTasks((prev) => prev.filter((t) => t.spaceId !== spaceToDelete.id));
+        setProjects((prev) => prev.filter((p) => p.spaceId !== spaceToDelete.id));
+
+        // Si l'espace supprimé était l'espace actif, basculer sur le premier restant
+        if (activeSpaceId === spaceToDelete.id) {
+          const nextActive = remainingSpaces[0]?.id || DEFAULT_SPACE_ID;
+          setActiveSpaceId(nextActive);
+          if (user?.uid) {
+            saveActiveSpaceId(user.uid, nextActive);
+          }
+        }
+
+        // Supprimer sur Firestore
+        if (user && !user.isLocalFallback) {
+          deleteSpaceFromFirestore(user.uid, spaceToDelete.id, tasks, projects).catch((err) => {
+            console.error('Erreur Firestore suppression espace:', err);
+          });
+        }
+
+        setConfirmModalConfig((cfg) => ({ ...cfg, isOpen: false }));
+        setIsWorkspaceModalOpen(false);
+        showToast(`Espace « ${spaceToDelete.nom} » et ses données ont été supprimés.`);
+      },
+    });
+  };
+
+  // Tri des tâches de l'espace actif
   const sortedAndFilteredTasks = useMemo(() => {
-    const filtered = tasks.filter((t) => {
+    const filtered = currentSpaceTasks.filter((t) => {
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchTitle = t.titre.toLowerCase().includes(query);
@@ -261,7 +458,7 @@ export default function App() {
     doneTasks.sort((a, b) => a.ordre - b.ordre);
 
     return [...activeTasks, ...doneTasks];
-  }, [tasks, searchQuery, selectedProjectFilter, selectedStatusFilter]);
+  }, [currentSpaceTasks, searchQuery, selectedProjectFilter, selectedStatusFilter]);
 
   // Gestion des changements de Statut
   const handleStatusChangeRequest = (task: Tache, newStatus: StatutTache) => {
@@ -293,7 +490,7 @@ export default function App() {
 
     let newOrdre = target.ordre;
     if (isNowDone) {
-      const maxOrdre = tasks.reduce((max, t) => Math.max(max, t.ordre), 0);
+      const maxOrdre = currentSpaceTasks.reduce((max, t) => Math.max(max, t.ordre), 0);
       newOrdre = maxOrdre + 1;
     }
 
@@ -358,7 +555,7 @@ export default function App() {
     showToast('Commentaire ajouté à l’historique.');
   };
 
-  // Création / Modification d'une tâche
+  // Création / Modification d'une tâche dans l'espace actif
   const handleSaveTask = (taskData: {
     titre: string;
     description: string;
@@ -385,6 +582,7 @@ export default function App() {
       const updatedTask: Tache = {
         ...editingTask,
         userId: user?.uid || editingTask.userId,
+        spaceId: editingTask.spaceId || currentSpace.id,
         titre: taskData.titre,
         description: taskData.description || '',
         projetId: taskData.projetId ?? null,
@@ -405,7 +603,7 @@ export default function App() {
 
       showToast('Tâche mise à jour avec succès.');
     } else {
-      const maxOrdre = tasks.reduce((max, t) => Math.max(max, t.ordre), 0);
+      const maxOrdre = currentSpaceTasks.reduce((max, t) => Math.max(max, t.ordre), 0);
       const comments = [];
       if (taskData.blockedReason && taskData.statut === 'Blocked') {
         comments.push({
@@ -418,6 +616,7 @@ export default function App() {
       const newTask: Tache = {
         id: 'task-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
         userId: user?.uid,
+        spaceId: currentSpace.id,
         titre: taskData.titre,
         description: taskData.description || '',
         projetId: taskData.projetId ?? null,
@@ -437,14 +636,14 @@ export default function App() {
         });
       }
 
-      showToast('Nouvelle tâche créée.');
+      showToast(`Nouvelle tâche créée dans « ${currentSpace.nom} ».`);
     }
 
     setIsTaskModalOpen(false);
     setEditingTask(null);
   };
 
-  // Demande de suppression de tâche (Modale de confirmation)
+  // Demande de suppression de tâche
   const handleRequestDeleteTask = (task: Tache) => {
     setConfirmModalConfig({
       isOpen: true,
@@ -463,11 +662,12 @@ export default function App() {
     });
   };
 
-  // Projets : Ajout
+  // Projets : Ajout dans l'espace actif
   const handleAddProject = (nom: string, couleur: string) => {
     const newProj: Projet = {
       id: 'proj-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
       userId: user?.uid,
+      spaceId: currentSpace.id,
       nom,
       couleur,
       dateCreation: new Date().toISOString(),
@@ -480,12 +680,12 @@ export default function App() {
       });
     }
 
-    showToast(`Projet « ${nom} » créé.`);
+    showToast(`Projet « ${nom} » créé dans « ${currentSpace.nom} ».`);
   };
 
-  // Projets : Demande de suppression (Modale de confirmation)
+  // Projets : Demande de suppression dans l'espace actif
   const handleRequestDeleteProject = (project: Projet) => {
-    const count = tasks.filter((t) => t.projetId === project.id).length;
+    const count = currentSpaceTasks.filter((t) => t.projetId === project.id).length;
     setConfirmModalConfig({
       isOpen: true,
       title: `Supprimer le projet « ${project.nom} » ?`,
@@ -512,19 +712,22 @@ export default function App() {
     });
   };
 
-  // Tâches d'exemples
+  // Tâches d'exemples dans l'espace actif
   const exampleTaskIds = ['task-1', 'task-2', 'task-3', 'task-4', 'task-5'];
   const hasExampleTasks = useMemo(() => {
-    return tasks.some((t) => exampleTaskIds.includes(t.id));
-  }, [tasks]);
+    return currentSpaceTasks.some((t) => exampleTaskIds.includes(t.id));
+  }, [currentSpaceTasks]);
 
   const handleClearExampleTasks = () => {
     setConfirmModalConfig({
       isOpen: true,
       title: "Supprimer les tâches d'exemples ?",
-      message: "Cette action va retirer les tâches de démonstration pour vous laisser un espace de travail vierge. Vos éventuelles nouvelles tâches seront conservées.",
+      message:
+        "Cette action va retirer les tâches de démonstration de cet espace pour vous laisser une to-do list vierge. Vos éventuelles nouvelles tâches seront conservées.",
       onConfirm: () => {
-        setTasks((prev) => prev.filter((t) => !exampleTaskIds.includes(t.id)));
+        setTasks((prev) =>
+          prev.filter((t) => !(t.spaceId === currentSpace.id && exampleTaskIds.includes(t.id)))
+        );
 
         if (user && !user.isLocalFallback) {
           deleteMultipleTasksFromFirestore(user.uid, exampleTaskIds).catch((err) => {
@@ -533,12 +736,12 @@ export default function App() {
         }
 
         setConfirmModalConfig((cfg) => ({ ...cfg, isOpen: false }));
-        showToast("Tâches d'exemples supprimées.");
+        showToast("Tâches d'exemples retirées.");
       },
     });
   };
 
-  // Drag and Drop Logic
+  // Drag and Drop Logic (restreint aux tâches de l'espace actif)
   const handleDragStart = (e: React.DragEvent, taskId: string) => {
     setDraggedTaskId(taskId);
     e.dataTransfer.effectAllowed = 'move';
@@ -598,9 +801,9 @@ export default function App() {
     showToast('Ordre des tâches mis à jour.');
   };
 
-  // Import / Export JSON
+  // Import / Export JSON (inclut les espaces)
   const handleExportJson = () => {
-    exportDataAsJson(tasks, projects, user?.uid);
+    exportDataAsJson(tasks, projects, spaces, user?.uid);
     showToast('Fichier JSON exporté avec succès.');
   };
 
@@ -623,25 +826,28 @@ export default function App() {
           return;
         }
 
-        const newTasks = validated.taches;
+        const newSpaces = validated.espaces || spaces;
         const newProjects = validated.projets;
+        const newTasks = validated.taches;
 
         setConfirmModalConfig({
           isOpen: true,
           title: 'Importer les données JSON ?',
-          message: `Ce fichier contient ${newTasks.length} tâche(s) et ${newProjects.length} projet(s). Voulez-vous remplacer votre contenu actuel par ces données et les synchroniser dans Firestore ?`,
+          message: `Ce fichier contient ${newSpaces.length} espace(s), ${newProjects.length} projet(s) et ${newTasks.length} tâche(s). Voulez-vous importer ces données et les synchroniser dans Firestore ?`,
           onConfirm: () => {
+            setSpaces(newSpaces);
+            setActiveSpaceId(newSpaces[0]?.id || DEFAULT_SPACE_ID);
             setProjects(newProjects);
             setTasks(newTasks);
 
             if (user && !user.isLocalFallback) {
-              importDataToFirestore(user.uid, newProjects, newTasks).catch((err) => {
+              importDataToFirestore(user.uid, newProjects, newTasks, newSpaces).catch((err) => {
                 console.error('Erreur Firestore import:', err);
               });
             }
 
             setConfirmModalConfig((cfg) => ({ ...cfg, isOpen: false }));
-            showToast('Données importées et synchronisées dans le cloud.');
+            showToast('Données et espaces importés avec succès.');
           },
         });
       } catch {
@@ -655,7 +861,7 @@ export default function App() {
     reader.readAsText(file);
   };
 
-  // Si l'état d'authentification est en cours de vérification
+  // Écran d'attente d'authentification
   if (authLoading) {
     return (
       <div id="auth-loading-screen" className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -670,13 +876,13 @@ export default function App() {
     );
   }
 
-  // Si l'utilisateur n'est pas connecté, afficher l'écran d'authentification
+  // Écran de connexion si non authentifié
   if (!user) {
     return <AuthScreen />;
   }
 
-  // Nombre de tâches en retard (sauf Done)
-  const overdueCount = tasks.filter((t) => {
+  // Tâches en retard dans l'espace actif
+  const overdueCount = currentSpaceTasks.filter((t) => {
     if (t.statut === 'Done') return false;
     if (!t.dateEcheance) return false;
     const today = new Date().toISOString().split('T')[0];
@@ -710,7 +916,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Input de fichier caché pour Import JSON */}
+      {/* Input caché pour Import JSON */}
       <input
         ref={fileInputRef}
         type="file"
@@ -719,53 +925,76 @@ export default function App() {
         onChange={handleFileChange}
       />
 
-      {/* HEADER SUPÉRIEUR */}
+      {/* HEADER SUPÉRIEUR AVEC SÉLECTEUR D'ESPACE */}
       <header id="main-header" className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md">
         <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            {/* Titre & Logo */}
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
+            {/* Titre, Logo & Sélecteur d'Espace de travail */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs shrink-0">
                 <ListTodo className="h-5 w-5" />
               </div>
+
               <div>
-                <h1 className="text-lg font-bold tracking-tight text-slate-900">
-                  Gestionnaire de Tâches
-                </h1>
-                <div className="flex items-center gap-2 text-xs text-slate-500">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-bold tracking-tight text-slate-900">
+                    Gestionnaire de Tâches
+                  </h1>
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                   <span>
-                    {tasks.length} tâche{tasks.length > 1 ? 's' : ''} • {projects.length} projet{projects.length > 1 ? 's' : ''}
+                    {currentSpaceTasks.length} tâche{currentSpaceTasks.length > 1 ? 's' : ''} •{' '}
+                    {currentSpaceProjects.length} projet{currentSpaceProjects.length > 1 ? 's' : ''}
                   </span>
                   <span className="text-slate-300">•</span>
                   {user.isLocalFallback ? (
                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200">
                       <Zap className="h-3 w-3 text-amber-500" />
-                      <span>Mode Démo / Local</span>
+                      <span>Local</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
                       <Cloud className="h-3 w-3" />
-                      <span>Cloud Firestore</span>
+                      <span>Cloud</span>
                     </span>
                   )}
                 </div>
+              </div>
+
+              {/* Sélecteur d'espace de travail (Workspaces) bien visible */}
+              <div className="ml-0 sm:ml-2 pl-0 sm:pl-3 sm:border-l sm:border-slate-200 flex items-center gap-1.5">
+                <WorkspaceSelector
+                  spaces={spaces}
+                  activeSpaceId={activeSpaceId}
+                  tasks={tasks}
+                  onSelectSpace={handleSelectSpace}
+                  onOpenManageModal={() => {
+                    setWorkspaceModalInitialMode('list');
+                    setIsWorkspaceModalOpen(true);
+                  }}
+                  onOpenCreateModal={() => {
+                    setWorkspaceModalInitialMode('create');
+                    setIsWorkspaceModalOpen(true);
+                  }}
+                />
               </div>
             </div>
 
             {/* Barre d'actions supérieures */}
             <div className="flex flex-wrap items-center gap-2">
-              {/* Bouton Projets */}
+              {/* Bouton Projets de l'espace actif */}
               <button
                 id="open-projects-manager-btn"
                 type="button"
                 onClick={() => setIsProjectModalOpen(true)}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs"
-                title="Gérer les projets"
+                title={`Gérer les projets de l'espace ${currentSpace.nom}`}
               >
                 <FolderPlus className="h-4 w-4 text-indigo-600" />
                 <span className="hidden sm:inline">Projets</span>
                 <span className="rounded-full bg-slate-100 px-1.5 py-0.2 text-[11px] font-bold text-slate-600">
-                  {projects.length}
+                  {currentSpaceProjects.length}
                 </span>
               </button>
 
@@ -776,7 +1005,7 @@ export default function App() {
                   type="button"
                   onClick={handleExportJson}
                   className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                  title="Exporter les données au format JSON"
+                  title="Exporter toutes les données (espaces, projets, tâches) au format JSON"
                 >
                   <Download className="h-3.5 w-3.5" />
                   <span className="hidden md:inline">Exporter</span>
@@ -885,13 +1114,13 @@ export default function App() {
               />
             )}
 
-            {/* BARRE SUPÉRIEURE DE RECHERCHE ET FILTRES */}
+            {/* BARRE SUPÉRIEURE DE RECHERCHE ET FILTRES DANS L'ESPACE ACTIF */}
             <div
               id="tasks-filters-bar"
               className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs"
             >
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                {/* Champ de recherche textuel */}
+                {/* Recherche textuelle */}
                 <div className="md:col-span-5 relative">
                   <label htmlFor="search-tasks-input" className="sr-only">
                     Rechercher une tâche
@@ -902,7 +1131,7 @@ export default function App() {
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Rechercher par mot-clé dans les tâches..."
+                    placeholder={`Rechercher dans « ${currentSpace.nom} »...`}
                     className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
@@ -919,10 +1148,10 @@ export default function App() {
                       onChange={(e) => setSelectedProjectFilter(e.target.value)}
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
                     >
-                      <option value="all">Tous les projets ({tasks.length})</option>
+                      <option value="all">Tous les projets ({currentSpaceTasks.length})</option>
                       <option value="none">Sans projet assigné</option>
-                      {projects.map((proj) => {
-                        const count = tasks.filter((t) => t.projetId === proj.id).length;
+                      {currentSpaceProjects.map((proj) => {
+                        const count = currentSpaceTasks.filter((t) => t.projetId === proj.id).length;
                         return (
                           <option key={proj.id} value={proj.id}>
                             {proj.nom} ({count})
@@ -952,7 +1181,7 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* Bouton de réinitialisation */}
+                {/* Réinitialisation */}
                 <div className="md:col-span-1 flex justify-end">
                   {hasActiveFilters ? (
                     <button
@@ -981,13 +1210,13 @@ export default function App() {
                 <div className="mt-3 flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 border border-rose-100">
                   <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
                   <span>
-                    Attention : {overdueCount} tâche{overdueCount > 1 ? 's ont' : ' a'} dépassé leur date d&apos;échéance.
+                    Attention : {overdueCount} tâche{overdueCount > 1 ? 's ont' : ' a'} dépassé leur date d&apos;échéance dans cet espace.
                   </span>
                 </div>
               )}
             </div>
 
-            {/* LISTE DES TÂCHES */}
+            {/* LISTE DES TÂCHES DE L'ESPACE */}
             <div id="tasks-list-container" className="space-y-2.5">
               {sortedAndFilteredTasks.length === 0 ? (
                 <div
@@ -998,12 +1227,14 @@ export default function App() {
                     <FileText className="h-6 w-6" />
                   </div>
                   <h3 className="text-sm font-semibold text-slate-900">
-                    {hasActiveFilters ? 'Aucune tâche ne correspond à vos filtres' : 'Votre to-do list est vide'}
+                    {hasActiveFilters
+                      ? 'Aucune tâche ne correspond à vos filtres'
+                      : `Aucune tâche dans l’espace « ${currentSpace.nom} »`}
                   </h3>
                   <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
                     {hasActiveFilters
-                      ? 'Essayez d’élargir vos termes de recherche ou de réinitialiser les filtres de statut et de projet.'
-                      : 'Créez votre première tâche pour commencer à organiser vos activités.'}
+                      ? 'Essayez d’élargir vos termes de recherche ou de réinitialiser les filtres.'
+                      : 'Créez votre première tâche pour commencer à organiser ce contexte de travail.'}
                   </p>
                   <div className="mt-4 flex justify-center gap-2">
                     {hasActiveFilters ? (
@@ -1068,15 +1299,21 @@ export default function App() {
             </div>
           </div>
         ) : (
-          /* PANNEAU DAILY REPORT */
-          <DailyReportPanel tasks={tasks} projects={projects} />
+          /* PANNEAU DAILY REPORT DE L'ESPACE ACTIF */
+          <DailyReportPanel
+            tasks={currentSpaceTasks}
+            projects={currentSpaceProjects}
+            activeSpace={currentSpace}
+          />
         )}
       </main>
 
       {/* FOOTER DISCRET */}
       <footer id="main-footer" className="mt-auto border-t border-slate-200 bg-white py-4 text-center text-xs text-slate-500">
         <div className="mx-auto max-w-6xl px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p>Données synchronisées en temps réel via Firebase Firestore • Accès multi-appareils</p>
+          <p>
+            Espace actif : <strong>{currentSpace.nom}</strong> • Données synchronisées en temps réel via Firebase Firestore
+          </p>
           {!showWelcome && (
             <button
               id="reopen-welcome-banner-btn"
@@ -1097,11 +1334,11 @@ export default function App() {
         </div>
       </footer>
 
-      {/* MODALE CRÉATION / ÉDITION TÂCHE */}
+      {/* MODALE CRÉATION / ÉDITION TÂCHE (Projets de l'espace actif) */}
       <TaskFormModal
         isOpen={isTaskModalOpen}
         initialTask={editingTask}
-        projects={projects}
+        projects={currentSpaceProjects}
         onSave={handleSaveTask}
         onClose={() => {
           setIsTaskModalOpen(false);
@@ -1117,17 +1354,32 @@ export default function App() {
         onCancel={() => setBlockedModalTask(null)}
       />
 
-      {/* MODALE GESTION DES PROJETS */}
+      {/* MODALE GESTION DES PROJETS DE L'ESPACE ACTIF */}
       <ProjectManagerModal
         isOpen={isProjectModalOpen}
-        projects={projects}
-        tasks={tasks}
+        projects={currentSpaceProjects}
+        tasks={currentSpaceTasks}
+        activeSpace={currentSpace}
         onAddProject={handleAddProject}
         onRequestDeleteProject={handleRequestDeleteProject}
         onClose={() => setIsProjectModalOpen(false)}
       />
 
-      {/* MODALE REUTILISABLE DE CONFIRMATION DE SUPPRESSION (Règle 3) */}
+      {/* MODALE GESTION DES ESPACES DE TRAVAIL (CRUD WORKSPACES) */}
+      <WorkspaceManagerModal
+        isOpen={isWorkspaceModalOpen}
+        initialMode={workspaceModalInitialMode}
+        spaces={spaces}
+        tasks={tasks}
+        projects={projects}
+        activeSpaceId={activeSpaceId}
+        onSelectSpace={handleSelectSpace}
+        onSaveSpace={handleSaveWorkspace}
+        onRequestDeleteSpace={handleRequestDeleteWorkspace}
+        onClose={() => setIsWorkspaceModalOpen(false)}
+      />
+
+      {/* MODALE REUTILISABLE DE CONFIRMATION DE SUPPRESSION */}
       <ConfirmationModal
         isOpen={confirmModalConfig.isOpen}
         title={confirmModalConfig.title}

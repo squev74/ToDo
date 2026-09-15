@@ -1,6 +1,6 @@
 {
   "name": "Gestionnaire de Tâches",
-  "description": "Application web de gestion de tâches multi-appareils avec synchronisation temps réel Firebase Firestore, authentification sécurisée, suivi de projets, drag-and-drop et rapport d'activité.",
+  "description": "Application web de gestion de tâches multi-appareils avec espaces de travail (workspaces), synchronisation temps réel Firebase Firestore, authentification sécurisée, suivi de projets, drag-and-drop et rapport d'activité.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

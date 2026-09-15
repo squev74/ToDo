@@ -6,9 +6,20 @@ export interface Commentaire {
   date: string; // Horodatage ISO (ex: "2026-09-11T14:30:00.000Z")
 }
 
+export interface Espace {
+  id: string;
+  userId?: string; // Identifiant du propriétaire
+  nom: string;
+  couleur: string; // Code couleur hex (ex: #6366f1)
+  icone?: string; // Nom de l'icône (ex: 'briefcase', 'home', 'heart', etc.)
+  description?: string;
+  dateCreation: string;
+}
+
 export interface Tache {
   id: string;
   userId?: string; // Identifiant unique du propriétaire
+  spaceId: string; // Identifiant de l'espace de travail (Workspace)
   titre: string;
   description: string;
   projetId: string | null;
@@ -23,6 +34,7 @@ export interface Tache {
 export interface Projet {
   id: string;
   userId?: string; // Identifiant unique du propriétaire
+  spaceId: string; // Identifiant de l'espace de travail (Workspace)
   nom: string;
   couleur: string; // Code couleur hex ou classe Tailwind
   dateCreation: string;
@@ -32,6 +44,8 @@ export interface AppDataExport {
   version: number;
   exportedAt: string;
   userId?: string;
+  espaces?: Espace[];
   projets: Projet[];
   taches: Tache[];
 }
+

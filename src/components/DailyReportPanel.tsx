@@ -12,12 +12,14 @@ import {
   Check,
   Sparkles,
 } from 'lucide-react';
-import { Tache, Projet } from '../types';
+import { Tache, Projet, Espace } from '../types';
 import { getTodayDateString } from '../utils/storage';
+import { getWorkspaceIconComponent } from '../utils/workspaceIcons';
 
 interface DailyReportPanelProps {
   tasks: Tache[];
   projects: Projet[];
+  activeSpace?: Espace;
 }
 
 function formatLocalDate(d: Date): string {
@@ -27,8 +29,9 @@ function formatLocalDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, projects }) => {
+export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, projects, activeSpace }) => {
   const todayStr = useMemo(() => getTodayDateString(), []);
+  const ActiveSpaceIcon = activeSpace ? getWorkspaceIconComponent(activeSpace.icone) : null;
 
   // Plage de dates : Date de début et Date de fin
   const [startDate, setStartDate] = useState<string>(todayStr);
@@ -335,13 +338,24 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
       >
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
                 <CalendarRange className="h-4 w-4" />
               </span>
               <h2 className="text-base font-bold text-slate-900">
                 Rapport d&apos;Activité & Suivi
               </h2>
+              {activeSpace && ActiveSpaceIcon && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                  <span
+                    className="flex h-4 w-4 items-center justify-center rounded text-white"
+                    style={{ backgroundColor: activeSpace.couleur || '#6366f1' }}
+                  >
+                    <ActiveSpaceIcon className="h-2.5 w-2.5 stroke-[2.5]" />
+                  </span>
+                  <span>Espace : {activeSpace.nom}</span>
+                </span>
+              )}
             </div>
             <p className="mt-1 text-xs text-slate-500 capitalize">
               {isSingleDay ? (

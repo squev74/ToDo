@@ -1,4 +1,6 @@
-import { Tache, Projet, AppDataExport } from '../types';
+import { Tache, Projet, Espace, AppDataExport } from '../types';
+
+export const DEFAULT_SPACE_ID = 'space-default';
 
 // Helper pour formater la date du jour YYYY-MM-DD
 export function getTodayDateString(): string {
@@ -9,12 +11,32 @@ export function getTodayDateString(): string {
   return `${year}-${month}-${day}`;
 }
 
-// Projets par défaut
-export function getDefaultProjects(userId?: string): Projet[] {
+// Espaces de travail par défaut
+export function getDefaultSpaces(userId?: string): Espace[] {
+  return [
+    {
+      id: DEFAULT_SPACE_ID,
+      userId,
+      nom: 'Mon espace',
+      couleur: '#6366f1',
+      icone: 'briefcase',
+      description: 'Espace principal par défaut',
+      dateCreation: '2026-09-01T00:00:00.000Z',
+    },
+  ];
+}
+
+// Projets par défaut pour un espace donné
+export function getDefaultProjects(
+  userId?: string,
+  spaceId: string = DEFAULT_SPACE_ID
+): Projet[] {
+  const effectiveSpaceId = spaceId || DEFAULT_SPACE_ID;
   return [
     {
       id: 'proj-1',
       userId,
+      spaceId: effectiveSpaceId,
       nom: 'Plateforme Web',
       couleur: '#3b82f6', // blue
       dateCreation: '2026-09-01T09:00:00.000Z',
@@ -22,6 +44,7 @@ export function getDefaultProjects(userId?: string): Projet[] {
     {
       id: 'proj-2',
       userId,
+      spaceId: effectiveSpaceId,
       nom: 'Marketing & Lancement',
       couleur: '#10b981', // emerald
       dateCreation: '2026-09-02T10:00:00.000Z',
@@ -29,6 +52,7 @@ export function getDefaultProjects(userId?: string): Projet[] {
     {
       id: 'proj-3',
       userId,
+      spaceId: effectiveSpaceId,
       nom: 'Sécurité & Infra',
       couleur: '#8b5cf6', // purple
       dateCreation: '2026-09-03T11:00:00.000Z',
@@ -38,16 +62,18 @@ export function getDefaultProjects(userId?: string): Projet[] {
 
 export const DEFAULT_PROJECTS = getDefaultProjects();
 
-// Tâches de démarrage avec assignation stricte à l'utilisateur
-export function getDefaultTasks(userId?: string): Tache[] {
+// Tâches de démarrage avec assignation stricte à l'utilisateur et à l'espace
+export function getDefaultTasks(
+  userId?: string,
+  spaceId: string = DEFAULT_SPACE_ID
+): Tache[] {
+  const effectiveSpaceId = spaceId || DEFAULT_SPACE_ID;
   const today = getTodayDateString();
   const nowIso = new Date().toISOString();
 
   // Date hier
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
-  const yesterdayIso = yesterday.toISOString();
 
   // Date passée (en retard)
   const pastDate = new Date();
@@ -63,6 +89,7 @@ export function getDefaultTasks(userId?: string): Tache[] {
     {
       id: 'task-1',
       userId,
+      spaceId: effectiveSpaceId,
       titre: 'Audit de sécurité des endpoints API',
       description: 'Vérifier la conformité des autorisations JWT et le rate limiting.',
       projetId: 'proj-3',
@@ -82,6 +109,7 @@ export function getDefaultTasks(userId?: string): Tache[] {
     {
       id: 'task-2',
       userId,
+      spaceId: effectiveSpaceId,
       titre: 'Rédiger la documentation de démarrage',
       description: 'Préparer le guide utilisateur et les FAQ pour les nouveaux arrivants.',
       projetId: 'proj-2',
@@ -95,44 +123,47 @@ export function getDefaultTasks(userId?: string): Tache[] {
     {
       id: 'task-3',
       userId,
+      spaceId: effectiveSpaceId,
       titre: 'Intégration du système de notifications par e-mail',
       description: 'Configuration du service SMTP et des modèles transactionnels.',
       projetId: 'proj-1',
-      statut: 'Blocked',
-      dateEcheance: yesterdayStr,
-      dateRealisation: null,
-      dateModification: yesterdayIso,
+      statut: 'Done',
+      dateEcheance: today,
+      dateRealisation: new Date(Date.now() - 3600000 * 4).toISOString(),
+      dateModification: new Date(Date.now() - 3600000 * 4).toISOString(),
       ordre: 3,
       commentaires: [
         {
           id: 'comm-2',
-          texte: 'Bloqué : En attente de validation des accès DNS et SPF/DKIM par l’équipe réseau.',
-          date: new Date(Date.now() - 3600000 * 2).toISOString(),
+          texte: 'Templates validés par le design.',
+          date: new Date(Date.now() - 3600000 * 5).toISOString(),
         },
       ],
     },
     {
       id: 'task-4',
       userId,
-      titre: 'Mise en page responsive du tableau de bord',
-      description: 'Optimisation de la grille sur écrans mobiles et tablettes.',
-      projetId: 'proj-1',
-      statut: 'Done',
-      dateEcheance: today,
-      dateRealisation: nowIso,
+      spaceId: effectiveSpaceId,
+      titre: 'Mise à niveau de la base de données vers v16',
+      description: 'Migration du schéma et tests de non-régression sur le cluster de staging.',
+      projetId: 'proj-3',
+      statut: 'Blocked',
+      dateEcheance: futureDateStr,
+      dateRealisation: null,
       dateModification: nowIso,
       ordre: 4,
       commentaires: [
         {
           id: 'comm-3',
-          texte: 'Validation QA réussie sur Chrome, Firefox et Safari.',
-          date: new Date(Date.now() - 3600000 * 1).toISOString(),
+          texte: 'Bloqué : En attente de la fenêtre de maintenance approuvée par le DevOps.',
+          date: new Date(Date.now() - 3600000 * 2).toISOString(),
         },
       ],
     },
     {
       id: 'task-5',
       userId,
+      spaceId: effectiveSpaceId,
       titre: 'Préparer la campagne de communication réseaux sociaux',
       description: 'Créer les visuels et le calendrier de diffusion de rentrée.',
       projetId: 'proj-2',
@@ -147,12 +178,61 @@ export function getDefaultTasks(userId?: string): Tache[] {
 }
 
 // Clés de stockage isolées par identifiant utilisateur (multi-tenant)
-function getUserStorageKey(userId: string, resource: 'tasks' | 'projects'): string {
+function getUserStorageKey(userId: string, resource: 'tasks' | 'projects' | 'spaces' | 'activeSpace'): string {
   const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
   return `todolist_${resource}_user_${safeId}`;
 }
 
-// Chargement des tâches isolées de l'utilisateur
+// Chargement des espaces de travail isolés de l'utilisateur
+export function loadUserSpacesFromStorage(userId: string): Espace[] {
+  if (!userId) return getDefaultSpaces();
+  try {
+    const raw = localStorage.getItem(getUserStorageKey(userId, 'spaces'));
+    if (!raw) return getDefaultSpaces(userId);
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.map((s) => ({
+        ...s,
+        userId,
+      }));
+    }
+  } catch (err) {
+    console.error('Erreur chargement espaces locaux:', err);
+  }
+  return getDefaultSpaces(userId);
+}
+
+// Sauvegarde des espaces de travail isolés de l'utilisateur
+export function saveUserSpacesToStorage(userId: string, spaces: Espace[]): void {
+  if (!userId) return;
+  try {
+    const scopedSpaces = spaces.map((s) => ({ ...s, userId }));
+    localStorage.setItem(getUserStorageKey(userId, 'spaces'), JSON.stringify(scopedSpaces));
+  } catch (err) {
+    console.error('Erreur sauvegarde espaces locaux:', err);
+  }
+}
+
+// Mémorisation de l'espace actif
+export function loadActiveSpaceId(userId: string): string | null {
+  if (!userId) return null;
+  try {
+    return localStorage.getItem(getUserStorageKey(userId, 'activeSpace'));
+  } catch {
+    return null;
+  }
+}
+
+export function saveActiveSpaceId(userId: string, spaceId: string): void {
+  if (!userId || !spaceId) return;
+  try {
+    localStorage.setItem(getUserStorageKey(userId, 'activeSpace'), spaceId);
+  } catch (err) {
+    console.error('Erreur sauvegarde espace actif:', err);
+  }
+}
+
+// Chargement des tâches isolées de l'utilisateur avec garantie de spaceId
 export function loadUserTasksFromStorage(userId: string): Tache[] {
   if (!userId) return [];
   try {
@@ -161,7 +241,12 @@ export function loadUserTasksFromStorage(userId: string): Tache[] {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
       // Filtrer strictement pour s'assurer qu'aucune tâche d'un autre utilisateur n'est retournée
-      return parsed.filter((t) => !t.userId || t.userId === userId);
+      return parsed
+        .filter((t) => !t.userId || t.userId === userId)
+        .map((t) => ({
+          ...t,
+          spaceId: t.spaceId || DEFAULT_SPACE_ID, // Rétrocompatibilité / migration automatique
+        }));
     }
   } catch (err) {
     console.error('Erreur chargement tâches locales:', err);
@@ -173,14 +258,18 @@ export function loadUserTasksFromStorage(userId: string): Tache[] {
 export function saveUserTasksToStorage(userId: string, tasks: Tache[]): void {
   if (!userId) return;
   try {
-    const scopedTasks = tasks.map((t) => ({ ...t, userId }));
+    const scopedTasks = tasks.map((t) => ({
+      ...t,
+      userId,
+      spaceId: t.spaceId || DEFAULT_SPACE_ID,
+    }));
     localStorage.setItem(getUserStorageKey(userId, 'tasks'), JSON.stringify(scopedTasks));
   } catch (err) {
     console.error('Erreur sauvegarde tâches locales:', err);
   }
 }
 
-// Chargement des projets isolés de l'utilisateur
+// Chargement des projets isolés de l'utilisateur avec garantie de spaceId
 export function loadUserProjectsFromStorage(userId: string): Projet[] {
   if (!userId) return [];
   try {
@@ -188,7 +277,12 @@ export function loadUserProjectsFromStorage(userId: string): Projet[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) {
-      return parsed.filter((p) => !p.userId || p.userId === userId);
+      return parsed
+        .filter((p) => !p.userId || p.userId === userId)
+        .map((p) => ({
+          ...p,
+          spaceId: p.spaceId || DEFAULT_SPACE_ID, // Rétrocompatibilité / migration automatique
+        }));
     }
   } catch (err) {
     console.error('Erreur chargement projets locaux:', err);
@@ -200,7 +294,11 @@ export function loadUserProjectsFromStorage(userId: string): Projet[] {
 export function saveUserProjectsToStorage(userId: string, projects: Projet[]): void {
   if (!userId) return;
   try {
-    const scopedProjects = projects.map((p) => ({ ...p, userId }));
+    const scopedProjects = projects.map((p) => ({
+      ...p,
+      userId,
+      spaceId: p.spaceId || DEFAULT_SPACE_ID,
+    }));
     localStorage.setItem(getUserStorageKey(userId, 'projects'), JSON.stringify(scopedProjects));
   } catch (err) {
     console.error('Erreur sauvegarde projets locaux:', err);
@@ -213,34 +311,25 @@ export function clearUserStorage(userId: string): void {
   try {
     localStorage.removeItem(getUserStorageKey(userId, 'tasks'));
     localStorage.removeItem(getUserStorageKey(userId, 'projects'));
+    localStorage.removeItem(getUserStorageKey(userId, 'spaces'));
+    localStorage.removeItem(getUserStorageKey(userId, 'activeSpace'));
   } catch (err) {
     console.error('Erreur nettoyage données locales:', err);
   }
 }
 
-// Rétrocompatibilité (pour imports sans userId explicite)
-export function loadTasksFromStorage(): Tache[] {
-  return [];
-}
-
-export function saveTasksToStorage(_tasks: Tache[]): void {
-  // Ne fait rien pour éviter la pollution globale partagée
-}
-
-export function loadProjectsFromStorage(): Projet[] {
-  return [];
-}
-
-export function saveProjectsToStorage(_projects: Projet[]): void {
-  // Ne fait rien pour éviter la pollution globale partagée
-}
-
-// Export global JSON
-export function exportDataAsJson(tasks: Tache[], projects: Projet[], userId?: string): void {
+// Export global JSON (avec espaces de travail)
+export function exportDataAsJson(
+  tasks: Tache[],
+  projects: Projet[],
+  spaces?: Espace[],
+  userId?: string
+): void {
   const exportPayload: AppDataExport = {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     userId,
+    espaces: spaces && spaces.length > 0 ? spaces : getDefaultSpaces(userId),
     projets: projects,
     taches: tasks,
   };
@@ -261,7 +350,7 @@ export function exportDataAsJson(tasks: Tache[], projects: Projet[], userId?: st
 export function validateImportData(
   data: unknown,
   currentUserId?: string
-): { valid: boolean; taches?: Tache[]; projets?: Projet[]; error?: string } {
+): { valid: boolean; taches?: Tache[]; projets?: Projet[]; espaces?: Espace[]; error?: string } {
   if (!data || typeof data !== 'object') {
     return { valid: false, error: 'Format de fichier JSON invalide.' };
   }
@@ -271,16 +360,34 @@ export function validateImportData(
     return { valid: false, error: 'Le fichier importé doit contenir les tableaux "taches" et "projets".' };
   }
 
-  // Vérification basique des tâches et attribution de l'userId
+  // Vérification basique des tâches
   for (const t of payload.taches) {
     if (!t.id || typeof t.titre !== 'string' || !t.statut) {
       return { valid: false, error: 'Une ou plusieurs tâches ont une structure corrompue.' };
     }
   }
 
+  // Espaces
+  let sanitizedSpaces: Espace[] = [];
+  if (Array.isArray(payload.espaces) && payload.espaces.length > 0) {
+    sanitizedSpaces = payload.espaces.map((s) => ({
+      ...s,
+      userId: currentUserId || s.userId,
+      nom: s.nom || 'Espace sans nom',
+      couleur: s.couleur || '#6366f1',
+      icone: s.icone || 'briefcase',
+      dateCreation: s.dateCreation || new Date().toISOString(),
+    }));
+  } else {
+    sanitizedSpaces = getDefaultSpaces(currentUserId);
+  }
+
+  const fallbackSpaceId = sanitizedSpaces[0]?.id || DEFAULT_SPACE_ID;
+
   const sanitizedTasks = payload.taches.map((t) => ({
     ...t,
     userId: currentUserId || t.userId,
+    spaceId: t.spaceId || fallbackSpaceId,
     description: t.description || '',
     projetId: t.projetId || null,
     dateEcheance: t.dateEcheance || null,
@@ -291,10 +398,12 @@ export function validateImportData(
   const sanitizedProjects = payload.projets.map((p) => ({
     ...p,
     userId: currentUserId || p.userId,
+    spaceId: p.spaceId || fallbackSpaceId,
   }));
 
   return {
     valid: true,
+    espaces: sanitizedSpaces,
     taches: sanitizedTasks,
     projets: sanitizedProjects,
   };

@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, Folder, Check } from 'lucide-react';
-import { Projet, Tache } from '../types';
+import { Projet, Tache, Espace } from '../types';
+import { getWorkspaceIconComponent } from '../utils/workspaceIcons';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
   projects: Projet[];
   tasks: Tache[];
+  activeSpace?: Espace;
   onAddProject: (nom: string, couleur: string) => void;
   onRequestDeleteProject: (projet: Projet) => void;
   onClose: () => void;
@@ -26,6 +28,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
   isOpen,
   projects,
   tasks,
+  activeSpace,
   onAddProject,
   onRequestDeleteProject,
   onClose,
@@ -35,6 +38,8 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
   const [error, setError] = useState('');
 
   if (!isOpen) return null;
+
+  const ActiveSpaceIcon = activeSpace ? getWorkspaceIconComponent(activeSpace.icone) : null;
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,10 +75,23 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
               <Folder className="h-5 w-5" />
             </div>
             <div>
-              <h3 id="project-manager-title" className="text-lg font-semibold text-slate-900">
-                Gestion des Projets
-              </h3>
-              <p className="text-xs text-slate-500">Créez et organisez vos dossiers de tâches</p>
+              <div className="flex items-center gap-2">
+                <h3 id="project-manager-title" className="text-base font-semibold text-slate-900">
+                  Gestion des Projets
+                </h3>
+                {activeSpace && ActiveSpaceIcon && (
+                  <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                    <span
+                      className="flex h-3.5 w-3.5 items-center justify-center rounded text-white"
+                      style={{ backgroundColor: activeSpace.couleur || '#6366f1' }}
+                    >
+                      <ActiveSpaceIcon className="h-2 w-2 stroke-[2.5]" />
+                    </span>
+                    <span className="truncate max-w-[120px]">{activeSpace.nom}</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500">Créez et organisez vos dossiers de tâches pour cet espace</p>
             </div>
           </div>
           <button
