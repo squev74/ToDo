@@ -1,5 +1,20 @@
 {
   "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Profil utilisateur avec rôle et statut d'accès",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "status": { "type": "string", "enum": ["pending", "approved", "disabled"] },
+        "dateCreation": { "type": "string" },
+        "derniereConnexion": { "type": "string" }
+      },
+      "required": ["uid", "email", "role", "status", "dateCreation"]
+    },
     "Space": {
       "title": "Space",
       "description": "Espace de travail (Workspace) pour cloisonner tâches et projets",
@@ -51,6 +66,10 @@
     }
   },
   "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Profil et rôle d'accès de l'utilisateur"
+    },
     "/users/{userId}/spaces/{spaceId}": {
       "schema": "Space",
       "description": "Espaces de travail de l'utilisateur"

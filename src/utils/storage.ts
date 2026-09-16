@@ -1,4 +1,4 @@
-import { Tache, Projet, Espace, AppDataExport } from '../types';
+import { Tache, Projet, Espace, AppDataExport, UserProfile } from '../types';
 
 export const DEFAULT_SPACE_ID = 'space-default';
 
@@ -417,3 +417,41 @@ export function isTaskOverdue(task: Tache): boolean {
   const today = getTodayDateString();
   return task.dateEcheance < today;
 }
+
+const USERS_CACHE_KEY = 'todolist_cached_users_list';
+const USER_PROFILE_KEY_PREFIX = 'todolist_user_profile_';
+
+export function getCachedUserProfile(uid: string): UserProfile | null {
+  try {
+    const raw = localStorage.getItem(USER_PROFILE_KEY_PREFIX + uid);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setCachedUserProfile(profile: UserProfile): void {
+  try {
+    localStorage.setItem(USER_PROFILE_KEY_PREFIX + profile.uid, JSON.stringify(profile));
+  } catch {
+    // Ignorer
+  }
+}
+
+export function getCachedUsersList(): UserProfile[] {
+  try {
+    const raw = localStorage.getItem(USERS_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function setCachedUsersList(users: UserProfile[]): void {
+  try {
+    localStorage.setItem(USERS_CACHE_KEY, JSON.stringify(users));
+  } catch {
+    // Ignorer
+  }
+}
+

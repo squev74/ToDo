@@ -5,6 +5,7 @@ import { Tache, Projet, StatutTache } from '../types';
 interface TaskFormModalProps {
   isOpen: boolean;
   initialTask?: Tache | null;
+  defaultStatus?: StatutTache;
   projects: Projet[];
   onSave: (taskData: {
     titre: string;
@@ -20,6 +21,7 @@ interface TaskFormModalProps {
 export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   isOpen,
   initialTask,
+  defaultStatus,
   projects,
   onSave,
   onClose,
@@ -27,7 +29,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [titre, setTitre] = useState('');
   const [description, setDescription] = useState('');
   const [projetId, setProjetId] = useState<string | null>(null);
-  const [statut, setStatut] = useState<StatutTache>('Open');
+  const [statut, setStatut] = useState<StatutTache>(defaultStatus || 'Open');
   const [dateEcheance, setDateEcheance] = useState('');
   const [blockedReason, setBlockedReason] = useState('');
   const [error, setError] = useState('');
@@ -44,12 +46,12 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setTitre('');
       setDescription('');
       setProjetId(projects.length > 0 ? projects[0].id : null);
-      setStatut('Open');
+      setStatut(defaultStatus || 'Open');
       setDateEcheance('');
       setBlockedReason('');
     }
     setError('');
-  }, [initialTask, isOpen, projects]);
+  }, [initialTask, isOpen, projects, defaultStatus]);
 
   if (!isOpen) return null;
 
@@ -193,6 +195,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 <option value="In Progress">En cours (In Progress)</option>
                 <option value="Blocked">Bloqué (Blocked)</option>
                 <option value="Done">Terminé (Done)</option>
+                <option value="Backlog">Backlog (En attente)</option>
               </select>
             </div>
           </div>

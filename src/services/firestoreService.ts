@@ -6,14 +6,35 @@ import {
   onSnapshot,
   writeBatch,
   getDocs,
+  getDoc,
 } from 'firebase/firestore';
+import { initializeApp as createFirebaseApp, deleteApp } from 'firebase/app';
+import {
+  getAuth as getSecondaryAuth,
+  createUserWithEmailAndPassword,
+  signOut as secondarySignOut,
+} from 'firebase/auth';
+import firebaseConfig from '../../firebase-applet-config.json';
 import { db, auth } from '../lib/firebase';
-import { Tache, Projet, Espace } from '../types';
+import {
+  Tache,
+  Projet,
+  Espace,
+  UserProfile,
+  UserRole,
+  UserStatus,
+  ADMIN_EMAIL,
+  ADMIN_UID,
+} from '../types';
 import {
   DEFAULT_SPACE_ID,
   getDefaultSpaces,
   getDefaultProjects,
   getDefaultTasks,
+  getCachedUserProfile,
+  setCachedUserProfile,
+  getCachedUsersList,
+  setCachedUsersList,
 } from '../utils/storage';
 
 export enum OperationType {
@@ -532,4 +553,292 @@ export async function importDataToFirestore(
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
   }
+}
+
+/**
+ * Synchronise et récupère le profil utilisateur dans Firestore (/users/{userId}).
+ * Applique la règle : squeva11@gmail.com = admin/approved d'office,
+ * les autres utilisateurs = user/pending par défaut à l'inscription.
+ */
+export async function syncUserProfile(user: {
+  uid: string;
+  email: string | null;
+  displayName?: string | null;
+}): Promise<UserProfile> {
+  const cleanEmail = (user.email || '').trim().toLowerCase();
+  const isAdminEmail =
+    cleanEmail === ADMIN_EMAIL.toLowerCase() || user.uid === ADMIN_UID;
+
+  const userDocRef = doc(db, 'users', user.uid);
+
+  try {
+    const snap = await getDoc(userDocRef);
+
+    if (snap.exists()) {
+      const existing = snap.data() as UserProfile;
+
+      // Si l'utilisateur est squeva11@gmail.com, forcer le statut admin & approved
+      if (isAdminEmail && (existing.role !== 'admin' || existing.status !== 'approved')) {
+        const updated: UserProfile = {
+          ...existing,
+          role: 'admin',
+          status: 'approved',
+          derniereConnexion: new Date().toISOString(),
+        };
+        await setDoc(userDocRef, updated, { merge: true });
+        setCachedUserProfile(updated);
+        return updated;
+      }
+
+      // Mettre à jour l'horodatage de dernière connexion
+      const updatedProfile: UserProfile = {
+        ...existing,
+        derniereConnexion: new Date().toISOString(),
+      };
+      setDoc(userDocRef, { derniereConnexion: updatedProfile.derniereConnexion }, { merge: true }).catch(
+        () => {}
+      );
+      setCachedUserProfile(updatedProfile);
+      return updatedProfile;
+    } else {
+      // Nouvel utilisateur : squeva11@gmail.com est admin/approved, les autres sont user/pending
+      const newProfile: UserProfile = {
+        uid: user.uid,
+        email: cleanEmail || 'utilisateur@demo.local',
+        displayName: user.displayName || cleanEmail.split('@')[0] || 'Utilisateur',
+        role: isAdminEmail ? 'admin' : 'user',
+        status: isAdminEmail ? 'approved' : 'pending',
+        dateCreation: new Date().toISOString(),
+        derniereConnexion: new Date().toISOString(),
+      };
+
+      await setDoc(userDocRef, newProfile, { merge: true });
+      setCachedUserProfile(newProfile);
+      return newProfile;
+    }
+  } catch (error: any) {
+    console.warn('Erreur accès profil Firestore, utilisation du cache local :', error?.message || error);
+    const cached = getCachedUserProfile(user.uid);
+    if (cached) {
+      if (isAdminEmail) {
+        cached.role = 'admin';
+        cached.status = 'approved';
+      }
+      return cached;
+    }
+
+    const fallbackProfile: UserProfile = {
+      uid: user.uid,
+      email: cleanEmail || 'utilisateur@demo.local',
+      displayName: user.displayName || cleanEmail.split('@')[0] || 'Utilisateur',
+      role: isAdminEmail ? 'admin' : 'user',
+      status: isAdminEmail ? 'approved' : 'pending',
+      dateCreation: new Date().toISOString(),
+    };
+    setCachedUserProfile(fallbackProfile);
+    return fallbackProfile;
+  }
+}
+
+/**
+ * Écoute en temps réel les changements du profil de l'utilisateur connecté.
+ */
+export function subscribeToUserProfile(
+  uid: string,
+  onUpdate: (profile: UserProfile) => void,
+  onError?: (err: any) => void
+): () => void {
+  const userDocRef = doc(db, 'users', uid);
+  return onSnapshot(
+    userDocRef,
+    (snap) => {
+      if (snap.exists()) {
+        const profile = snap.data() as UserProfile;
+        setCachedUserProfile(profile);
+        onUpdate(profile);
+      }
+    },
+    (err) => {
+      console.warn('Écoute profil Firestore différée :', err.message);
+      if (onError) onError(err);
+    }
+  );
+}
+
+/**
+ * Écoute la liste de tous les utilisateurs enregistrés pour le Panneau Admin.
+ */
+export function subscribeToAllUsers(
+  onUsersChange: (users: UserProfile[]) => void,
+  onError?: (err: any) => void
+): () => void {
+  const usersColl = collection(db, 'users');
+  return onSnapshot(
+    usersColl,
+    (snapshot) => {
+      const userList: UserProfile[] = [];
+      snapshot.forEach((d) => {
+        const u = d.data() as UserProfile;
+        userList.push(u);
+      });
+
+      // S'assurer que squeva11@gmail.com apparaît toujours
+      const hasAdminInList = userList.some(
+        (u) =>
+          u.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() ||
+          u.uid === ADMIN_UID
+      );
+      if (!hasAdminInList) {
+        userList.unshift({
+          uid: ADMIN_UID,
+          email: ADMIN_EMAIL,
+          displayName: 'Administrateur',
+          role: 'admin',
+          status: 'approved',
+          dateCreation: '2026-09-01T00:00:00.000Z',
+        });
+      }
+
+      userList.sort(
+        (a, b) => new Date(b.dateCreation).getTime() - new Date(a.dateCreation).getTime()
+      );
+      setCachedUsersList(userList);
+      onUsersChange(userList);
+    },
+    (err) => {
+      console.warn('Accès à la collection users Firestore différé :', err.message);
+      const cached = getCachedUsersList();
+      if (cached.length > 0) {
+        onUsersChange(cached);
+      }
+      if (onError) onError(err);
+    }
+  );
+}
+
+/**
+ * Met à jour le statut d'un utilisateur ('pending' | 'approved' | 'disabled').
+ */
+export async function updateUserStatus(targetUid: string, newStatus: UserStatus): Promise<void> {
+  const userDocRef = doc(db, 'users', targetUid);
+  await setDoc(userDocRef, { status: newStatus }, { merge: true });
+
+  // Mettre à jour le cache local
+  const cached = getCachedUsersList();
+  const updated = cached.map((u) => (u.uid === targetUid ? { ...u, status: newStatus } : u));
+  setCachedUsersList(updated);
+
+  const singleCached = getCachedUserProfile(targetUid);
+  if (singleCached) {
+    setCachedUserProfile({ ...singleCached, status: newStatus });
+  }
+}
+
+/**
+ * Met à jour le rôle d'un utilisateur ('admin' | 'user').
+ */
+export async function updateUserRole(targetUid: string, newRole: UserRole): Promise<void> {
+  const userDocRef = doc(db, 'users', targetUid);
+  await setDoc(userDocRef, { role: newRole }, { merge: true });
+
+  const cached = getCachedUsersList();
+  const updated = cached.map((u) => (u.uid === targetUid ? { ...u, role: newRole } : u));
+  setCachedUsersList(updated);
+}
+
+/**
+ * Supprime un utilisateur de Firestore ainsi que l'ensemble de ses données liées (espaces, projets, tâches).
+ */
+export async function deleteUserAndData(targetUid: string): Promise<void> {
+  // 1. Supprimer les sous-collections espaces, projets, tâches
+  try {
+    const spacesColl = collection(db, 'users', targetUid, 'spaces');
+    const projectsColl = collection(db, 'users', targetUid, 'projects');
+    const tasksColl = collection(db, 'users', targetUid, 'tasks');
+
+    const [spacesSnap, projectsSnap, tasksSnap] = await Promise.all([
+      getDocs(spacesColl).catch(() => null),
+      getDocs(projectsColl).catch(() => null),
+      getDocs(tasksColl).catch(() => null),
+    ]);
+
+    const batch = writeBatch(db);
+    spacesSnap?.forEach((d) => batch.delete(d.ref));
+    projectsSnap?.forEach((d) => batch.delete(d.ref));
+    tasksSnap?.forEach((d) => batch.delete(d.ref));
+
+    // Supprimer le document utilisateur
+    const userDocRef = doc(db, 'users', targetUid);
+    batch.delete(userDocRef);
+
+    await batch.commit();
+  } catch (error) {
+    // Si batch échoue, tenter la suppression directe du document utilisateur
+    try {
+      await deleteDoc(doc(db, 'users', targetUid));
+    } catch (e) {
+      console.error('Erreur suppression utilisateur :', e);
+      throw e;
+    }
+  }
+
+  // Nettoyer les caches locaux
+  const cached = getCachedUsersList();
+  setCachedUsersList(cached.filter((u) => u.uid !== targetUid));
+}
+
+/**
+ * Création d'un utilisateur par l'administrateur avec statut directement 'approved'.
+ * Utilise une instance Firebase secondaire pour ne pas déconnecter l'administrateur en cours.
+ */
+export async function adminCreateUser(
+  email: string,
+  pass: string,
+  displayName?: string
+): Promise<UserProfile> {
+  const cleanEmail = email.trim().toLowerCase();
+  const isAdmin = cleanEmail === ADMIN_EMAIL.toLowerCase();
+
+  let uid = '';
+  try {
+    const secondaryApp = createFirebaseApp(firebaseConfig, `admin-create-${Date.now()}`);
+    const secondaryAuth = getSecondaryAuth(secondaryApp);
+    const userCred = await createUserWithEmailAndPassword(secondaryAuth, cleanEmail, pass);
+    uid = userCred.user.uid;
+    await secondarySignOut(secondaryAuth);
+    await deleteApp(secondaryApp);
+  } catch (authError: any) {
+    if (authError.code === 'auth/email-already-in-use') {
+      throw new Error('Un compte existe déjà avec cette adresse email.');
+    }
+    if (authError.code === 'auth/weak-password') {
+      throw new Error('Le mot de passe doit comporter au moins 6 caractères.');
+    }
+    uid = 'admin-created-' + btoa(cleanEmail).replace(/=/g, '').substring(0, 16);
+  }
+
+  const newProfile: UserProfile = {
+    uid,
+    email: cleanEmail,
+    displayName: displayName?.trim() || cleanEmail.split('@')[0],
+    role: isAdmin ? 'admin' : 'user',
+    status: 'approved', // Validé d'office par l'admin
+    dateCreation: new Date().toISOString(),
+  };
+
+  const userDocRef = doc(db, 'users', uid);
+  await setDoc(userDocRef, newProfile, { merge: true });
+
+  // Initialiser l'espace par défaut et projets de démo pour cet utilisateur
+  try {
+    await initializeUserInitialDataIfEmpty(uid);
+  } catch {
+    // Ignorer si différé
+  }
+
+  // Mettre à jour le cache
+  const cached = getCachedUsersList();
+  setCachedUsersList([newProfile, ...cached.filter((u) => u.uid !== uid)]);
+
+  return newProfile;
 }

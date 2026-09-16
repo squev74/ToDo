@@ -3,28 +3,29 @@ service cloud.firestore {
   match /databases/{database}/documents {
     // Permet le test de connexion initial
     match /test/connection {
-      allow read: if true;
+      allow read, write: if true;
     }
 
+    // Collection des administrateurs
+    match /admins/{adminId} {
+      allow read, write: if true;
+    }
+
+    // Collection des profils utilisateurs et sous-collections
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if true;
 
-      match /spaces/{spaceId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      match /projects/{projectId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
-      match /tasks/{taskId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
-
+      // Sous-collections (espaces, projets, tâches)
       match /{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if true;
       }
+    }
+
+    // Règle globale de secours pour les collections de premier niveau
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
+
 

@@ -1,4 +1,20 @@
-export type StatutTache = 'Open' | 'In Progress' | 'Blocked' | 'Done';
+export type StatutTache = 'Backlog' | 'Open' | 'In Progress' | 'Blocked' | 'Done' | 'backlog';
+
+export const ADMIN_EMAIL = 'squeva11@gmail.com';
+export const ADMIN_UID = 'G1Dm03dHRvPelWT8c2ydqXLC1Y93';
+
+export type UserRole = 'admin' | 'user';
+export type UserStatus = 'pending' | 'approved' | 'disabled';
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName?: string | null;
+  role: UserRole;
+  status: UserStatus;
+  dateCreation: string;
+  derniereConnexion?: string;
+}
 
 export interface Commentaire {
   id: string;

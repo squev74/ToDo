@@ -16,6 +16,7 @@ import {
   Cloud,
   Loader2,
   Zap,
+  Shield,
 } from 'lucide-react';
 import { Tache, Projet, Espace, StatutTache } from './types';
 import {
@@ -49,6 +50,8 @@ import {
 } from './services/firestoreService';
 import { useAuth } from './context/AuthContext';
 import { AuthScreen } from './components/AuthScreen';
+import { AccessDenied } from './components/AccessDenied';
+import { AdminPanel } from './components/AdminPanel';
 import { TaskItem } from './components/TaskItem';
 import { TaskFormModal } from './components/TaskFormModal';
 import { BlockedReasonModal } from './components/BlockedReasonModal';
@@ -58,9 +61,12 @@ import { DailyReportPanel } from './components/DailyReportPanel';
 import { WelcomeBanner } from './components/WelcomeBanner';
 import { WorkspaceSelector } from './components/WorkspaceSelector';
 import { WorkspaceManagerModal } from './components/WorkspaceManagerModal';
+import { Header } from './components/Header';
+import { TaskFilterBar } from './components/TaskFilterBar';
+import { BacklogView } from './components/BacklogView';
 
 export default function App() {
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading, logout, isAdmin, isApproved } = useAuth();
 
   // Données strictement isolées par utilisateur
   const [spaces, setSpaces] = useState<Espace[]>(() => getDefaultSpaces());
@@ -88,13 +94,14 @@ export default function App() {
     }
   };
 
-  // Navigation Vue Principale : 'tasks' | 'report'
-  const [currentView, setCurrentView] = useState<'tasks' | 'report'>('tasks');
+  // Navigation Vue Principale : 'tasks' | 'backlog' | 'report' | 'admin'
+  const [currentView, setCurrentView] = useState<'tasks' | 'backlog' | 'report' | 'admin'>('tasks');
+  const [taskModalDefaultStatus, setTaskModalDefaultStatus] = useState<StatutTache>('Open');
 
-  // Filtres et Recherche
+  // Filtres et Recherche Multi-Sélection
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProjectFilter, setSelectedProjectFilter] = useState<string>('all');
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('all');
+  const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]); // Vide = tous les projets
+  const [selectedStatuses, setSelectedStatuses] = useState<StatutTache[]>([]); // Vide = tous les statuts
 
   // Modales Tâche et Projet
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -138,8 +145,8 @@ export default function App() {
 
   // Synchronisation en temps réel avec Firebase Firestore strictement isolée par compte utilisateur
   useEffect(() => {
-    if (!user) {
-      // Déconnecté : vider l'état
+    if (!user || !isApproved) {
+      // Déconnecté ou accès non validé ('pending' / 'disabled') : vider l'état
       setSpaces(getDefaultSpaces());
       setActiveSpaceId(DEFAULT_SPACE_ID);
       setTasks([]);
@@ -249,7 +256,7 @@ export default function App() {
       isMounted = false;
       unsubscribe();
     };
-  }, [user]);
+  }, [user, isApproved]);
 
   // Sauvegardes miroir dans le localStorage
   useEffect(() => {
@@ -280,6 +287,20 @@ export default function App() {
   const currentSpaceTasks = useMemo(() => {
     return tasks.filter((t) => (t.spaceId || DEFAULT_SPACE_ID) === currentSpace.id);
   }, [tasks, currentSpace.id]);
+
+  // Tâches actives de l'espace (hors statut Backlog - vue principale Kanban opérationnelle)
+  const activeSpaceTasks = useMemo(() => {
+    return currentSpaceTasks.filter(
+      (t) => (t.statut as string)?.toLowerCase() !== 'backlog'
+    );
+  }, [currentSpaceTasks]);
+
+  // Tâches en attente dans le Backlog de l'espace actif
+  const backlogSpaceTasks = useMemo(() => {
+    return currentSpaceTasks.filter(
+      (t) => (t.statut as string)?.toLowerCase() === 'backlog'
+    );
+  }, [currentSpaceTasks]);
 
   const currentSpaceProjects = useMemo(() => {
     return projects.filter((p) => (p.spaceId || DEFAULT_SPACE_ID) === currentSpace.id);
@@ -314,13 +335,20 @@ export default function App() {
       saveActiveSpaceId(user.uid, spaceId);
     }
     // Réinitialisation des filtres locaux lors d'un changement d'espace pour un affichage propre
-    setSelectedProjectFilter('all');
-    setSelectedStatusFilter('all');
+    setSelectedProjectIds([]);
+    setSelectedStatuses([]);
     setSearchQuery('');
     const targetSpace = spaces.find((s) => s.id === spaceId);
     if (targetSpace) {
       showToast(`Espace « ${targetSpace.nom} » activé.`);
     }
+  };
+
+  // Réinitialisation rapide de tous les filtres
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setSelectedProjectIds([]);
+    setSelectedStatuses([]);
   };
 
   // Enregistrer (Créer ou Modifier) un espace de travail
@@ -426,9 +454,10 @@ export default function App() {
     });
   };
 
-  // Tri des tâches de l'espace actif
+  // Tri et Filtrage multi-critères des tâches de l'espace actif (hors Backlog)
   const sortedAndFilteredTasks = useMemo(() => {
-    const filtered = currentSpaceTasks.filter((t) => {
+    const filtered = activeSpaceTasks.filter((t) => {
+      // 1. Recherche textuelle dans le titre ou la description
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
         const matchTitle = t.titre.toLowerCase().includes(query);
@@ -436,16 +465,19 @@ export default function App() {
         if (!matchTitle && !matchDesc) return false;
       }
 
-      if (selectedProjectFilter !== 'all') {
-        if (selectedProjectFilter === 'none') {
-          if (t.projetId !== null && t.projetId !== '') return false;
-        } else if (t.projetId !== selectedProjectFilter) {
+      // 2. Filtre Multi-sélection Projets (vide = tous les projets autorisés)
+      if (selectedProjectIds.length > 0) {
+        const taskProjectId = t.projetId && t.projetId.trim() !== '' ? t.projetId : 'none';
+        if (!selectedProjectIds.includes(taskProjectId)) {
           return false;
         }
       }
 
-      if (selectedStatusFilter !== 'all' && t.statut !== selectedStatusFilter) {
-        return false;
+      // 3. Filtre Multi-sélection Statuts (vide = tous les statuts autorisés)
+      if (selectedStatuses.length > 0) {
+        if (!selectedStatuses.includes(t.statut)) {
+          return false;
+        }
       }
 
       return true;
@@ -458,7 +490,7 @@ export default function App() {
     doneTasks.sort((a, b) => a.ordre - b.ordre);
 
     return [...activeTasks, ...doneTasks];
-  }, [currentSpaceTasks, searchQuery, selectedProjectFilter, selectedStatusFilter]);
+  }, [activeSpaceTasks, searchQuery, selectedProjectIds, selectedStatuses]);
 
   // Gestion des changements de Statut
   const handleStatusChangeRequest = (task: Tache, newStatus: StatutTache) => {
@@ -516,6 +548,10 @@ export default function App() {
       showToast('Tâche marquée comme terminée.');
     } else if (newStatus === 'Blocked') {
       showToast('Tâche marquée comme bloquée avec motif.');
+    } else if (newStatus === 'Backlog' || (newStatus as string) === 'backlog') {
+      showToast('Tâche déplacée dans le Backlog.');
+    } else if (newStatus === 'Open') {
+      showToast('Tâche transférée dans les tâches actives (À faire).');
     }
   };
 
@@ -660,6 +696,60 @@ export default function App() {
         showToast('Tâche supprimée définitivement.');
       },
     });
+  };
+
+  // Ajout rapide d'une tâche directement dans le Backlog
+  const handleQuickAddBacklogTask = (titre: string, projetId?: string | null) => {
+    const maxOrdre = currentSpaceTasks.reduce((max, t) => Math.max(max, t.ordre), 0);
+    const newTask: Tache = {
+      id: 'task-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      userId: user?.uid,
+      spaceId: currentSpace.id,
+      titre: titre.trim(),
+      description: '',
+      projetId: projetId ?? null,
+      statut: 'Backlog',
+      dateEcheance: null,
+      dateRealisation: null,
+      dateModification: new Date().toISOString(),
+      ordre: maxOrdre + 1,
+      commentaires: [],
+    };
+
+    setTasks((prev) => [newTask, ...prev]);
+
+    if (user && !user.isLocalFallback) {
+      saveTaskToFirestore(user.uid, newTask).catch((err) => {
+        console.error('Erreur Firestore création tâche backlog:', err);
+      });
+    }
+
+    showToast('Idée ajoutée au Backlog.');
+  };
+
+  // Réordonnancement des tâches du Backlog (Drag & Drop)
+  const handleReorderBacklogTasks = (reorderedBacklogTasks: Tache[]) => {
+    const orderMap = new Map<string, number>();
+    reorderedBacklogTasks.forEach((t, idx) => {
+      orderMap.set(t.id, idx + 1);
+    });
+
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (orderMap.has(t.id)) {
+          return { ...t, ordre: orderMap.get(t.id)! };
+        }
+        return t;
+      })
+    );
+
+    if (user && !user.isLocalFallback) {
+      reorderedBacklogTasks.forEach((t, idx) => {
+        saveTaskToFirestore(user.uid, { ...t, ordre: idx + 1 }).catch((err) => {
+          console.error('Erreur Firestore réordonnancement backlog:', err);
+        });
+      });
+    }
   };
 
   // Projets : Ajout dans l'espace actif
@@ -881,8 +971,13 @@ export default function App() {
     return <AuthScreen />;
   }
 
-  // Tâches en retard dans l'espace actif
-  const overdueCount = currentSpaceTasks.filter((t) => {
+  // Garde-fou d'accès restreint : Si le compte est 'pending' ou 'disabled'
+  if (!isApproved) {
+    return <AccessDenied onLogout={handleLogout} />;
+  }
+
+  // Tâches en retard dans l'espace actif (exclut le Backlog)
+  const overdueCount = activeSpaceTasks.filter((t) => {
     if (t.statut === 'Done') return false;
     if (!t.dateEcheance) return false;
     const today = new Date().toISOString().split('T')[0];
@@ -892,8 +987,8 @@ export default function App() {
   // Filtres actifs ?
   const hasActiveFilters =
     searchQuery.trim() !== '' ||
-    selectedProjectFilter !== 'all' ||
-    selectedStatusFilter !== 'all';
+    selectedProjectIds.length > 0 ||
+    selectedStatuses.length > 0;
 
   return (
     <div id="app-root" className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans">
@@ -925,181 +1020,56 @@ export default function App() {
         onChange={handleFileChange}
       />
 
-      {/* HEADER SUPÉRIEUR AVEC SÉLECTEUR D'ESPACE */}
-      <header id="main-header" className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur-md">
-        <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            {/* Titre, Logo & Sélecteur d'Espace de travail */}
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs shrink-0">
-                <ListTodo className="h-5 w-5" />
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-lg font-bold tracking-tight text-slate-900">
-                    Gestionnaire de Tâches
-                  </h1>
-                </div>
-
-                <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                  <span>
-                    {currentSpaceTasks.length} tâche{currentSpaceTasks.length > 1 ? 's' : ''} •{' '}
-                    {currentSpaceProjects.length} projet{currentSpaceProjects.length > 1 ? 's' : ''}
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  {user.isLocalFallback ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200">
-                      <Zap className="h-3 w-3 text-amber-500" />
-                      <span>Local</span>
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
-                      <Cloud className="h-3 w-3" />
-                      <span>Cloud</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Sélecteur d'espace de travail (Workspaces) bien visible */}
-              <div className="ml-0 sm:ml-2 pl-0 sm:pl-3 sm:border-l sm:border-slate-200 flex items-center gap-1.5">
-                <WorkspaceSelector
-                  spaces={spaces}
-                  activeSpaceId={activeSpaceId}
-                  tasks={tasks}
-                  onSelectSpace={handleSelectSpace}
-                  onOpenManageModal={() => {
-                    setWorkspaceModalInitialMode('list');
-                    setIsWorkspaceModalOpen(true);
-                  }}
-                  onOpenCreateModal={() => {
-                    setWorkspaceModalInitialMode('create');
-                    setIsWorkspaceModalOpen(true);
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Barre d'actions supérieures */}
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Bouton Projets de l'espace actif */}
-              <button
-                id="open-projects-manager-btn"
-                type="button"
-                onClick={() => setIsProjectModalOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs"
-                title={`Gérer les projets de l'espace ${currentSpace.nom}`}
-              >
-                <FolderPlus className="h-4 w-4 text-indigo-600" />
-                <span className="hidden sm:inline">Projets</span>
-                <span className="rounded-full bg-slate-100 px-1.5 py-0.2 text-[11px] font-bold text-slate-600">
-                  {currentSpaceProjects.length}
-                </span>
-              </button>
-
-              {/* Boutons Exporter / Importer JSON */}
-              <div className="flex items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-2xs">
-                <button
-                  id="export-json-button"
-                  type="button"
-                  onClick={handleExportJson}
-                  className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                  title="Exporter toutes les données (espaces, projets, tâches) au format JSON"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">Exporter</span>
-                </button>
-                <div className="h-4 w-px bg-slate-200" />
-                <button
-                  id="import-json-button"
-                  type="button"
-                  onClick={handleTriggerFileInput}
-                  className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
-                  title="Importer un fichier JSON"
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  <span className="hidden md:inline">Importer</span>
-                </button>
-              </div>
-
-              {/* Bouton Nouvelle Tâche */}
-              <button
-                id="create-task-primary-btn"
-                type="button"
-                onClick={() => {
-                  setEditingTask(null);
-                  setIsTaskModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-xs"
-              >
-                <Plus className="h-4 w-4 stroke-[2.5]" />
-                <span>Nouvelle tâche</span>
-              </button>
-
-              {/* Compte Utilisateur & Déconnexion */}
-              <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-slate-200">
-                <div className="hidden lg:flex flex-col text-right">
-                  <span className="text-[11px] font-semibold text-slate-700 truncate max-w-[130px]" title={user.email || ''}>
-                    {user.email}
-                  </span>
-                  <span className="text-[10px] text-slate-400">
-                    {user.isLocalFallback ? 'Session Démo' : 'Connecté'}
-                  </span>
-                </div>
-
-                <button
-                  id="logout-btn"
-                  type="button"
-                  onClick={handleLogout}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-colors shadow-2xs"
-                  title="Se déconnecter"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Déconnexion</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Navigation par Onglets (Vues) */}
-          <div className="mt-3 flex items-center border-t border-slate-100 pt-2.5">
-            <div className="flex items-center gap-2">
-              <button
-                id="tab-view-tasks"
-                type="button"
-                onClick={() => setCurrentView('tasks')}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  currentView === 'tasks'
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                <ListTodo className="h-3.5 w-3.5" />
-                <span>Liste des tâches</span>
-              </button>
-
-              <button
-                id="tab-view-report"
-                type="button"
-                onClick={() => setCurrentView('report')}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                  currentView === 'report'
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-              >
-                <CalendarCheck className="h-3.5 w-3.5" />
-                <span>Rapport d&apos;Activité & Suivi</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* HEADER SUPÉRIEUR AVEC SÉLECTEUR D'ESPACE ET NAVIGATION */}
+      <Header
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        spaces={spaces}
+        activeSpaceId={activeSpaceId}
+        tasks={tasks}
+        projects={projects}
+        onSelectSpace={handleSelectSpace}
+        onOpenWorkspaceModal={(mode) => {
+          setWorkspaceModalInitialMode(mode);
+          setIsWorkspaceModalOpen(true);
+        }}
+        onOpenProjectModal={() => setIsProjectModalOpen(true)}
+        onOpenTaskModal={() => {
+          setEditingTask(null);
+          setTaskModalDefaultStatus(currentView === 'backlog' ? 'Backlog' : 'Open');
+          setIsTaskModalOpen(true);
+        }}
+        onExportJson={handleExportJson}
+        onImportJson={handleTriggerFileInput}
+        onLogout={handleLogout}
+      />
 
       {/* CONTENU PRINCIPAL */}
       <main id="main-content" className="mx-auto max-w-6xl w-full flex-1 px-4 py-6 sm:px-6">
-        {currentView === 'tasks' ? (
+        {currentView === 'admin' ? (
+          <AdminPanel onBack={() => setCurrentView('tasks')} />
+        ) : currentView === 'backlog' ? (
+          <BacklogView
+            tasks={currentSpaceTasks}
+            projects={currentSpaceProjects}
+            activeSpace={currentSpace}
+            onStatusChange={handleStatusChangeRequest}
+            onEditTask={(t) => {
+              setEditingTask(t);
+              setTaskModalDefaultStatus('Backlog');
+              setIsTaskModalOpen(true);
+            }}
+            onDeleteTask={handleRequestDeleteTask}
+            onAddComment={handleAddCommentToTask}
+            onQuickAddTask={handleQuickAddBacklogTask}
+            onOpenCreateModal={() => {
+              setEditingTask(null);
+              setTaskModalDefaultStatus('Backlog');
+              setIsTaskModalOpen(true);
+            }}
+            onReorderTasks={handleReorderBacklogTasks}
+          />
+        ) : currentView === 'tasks' ? (
           <div className="space-y-4">
             {/* MESSAGE DE BIENVENUE POUR LES NOUVEAUX UTILISATEURS */}
             {showWelcome && (
@@ -1107,6 +1077,7 @@ export default function App() {
                 onDismiss={handleDismissWelcome}
                 onNewTaskClick={() => {
                   setEditingTask(null);
+                  setTaskModalDefaultStatus('Open');
                   setIsTaskModalOpen(true);
                 }}
                 onClearExamplesClick={handleClearExampleTasks}
@@ -1114,110 +1085,23 @@ export default function App() {
               />
             )}
 
-            {/* BARRE SUPÉRIEURE DE RECHERCHE ET FILTRES DANS L'ESPACE ACTIF */}
-            <div
-              id="tasks-filters-bar"
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
-                {/* Recherche textuelle */}
-                <div className="md:col-span-5 relative">
-                  <label htmlFor="search-tasks-input" className="sr-only">
-                    Rechercher une tâche
-                  </label>
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    id="search-tasks-input"
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={`Rechercher dans « ${currentSpace.nom} »...`}
-                    className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
-                  />
-                </div>
-
-                {/* Filtre par Projet */}
-                <div className="md:col-span-3">
-                  <label htmlFor="filter-project-select" className="sr-only">
-                    Filtrer par projet
-                  </label>
-                  <div className="relative">
-                    <select
-                      id="filter-project-select"
-                      value={selectedProjectFilter}
-                      onChange={(e) => setSelectedProjectFilter(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
-                    >
-                      <option value="all">Tous les projets ({currentSpaceTasks.length})</option>
-                      <option value="none">Sans projet assigné</option>
-                      {currentSpaceProjects.map((proj) => {
-                        const count = currentSpaceTasks.filter((t) => t.projetId === proj.id).length;
-                        return (
-                          <option key={proj.id} value={proj.id}>
-                            {proj.nom} ({count})
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Filtre par Statut */}
-                <div className="md:col-span-3">
-                  <label htmlFor="filter-status-select" className="sr-only">
-                    Filtrer par statut
-                  </label>
-                  <select
-                    id="filter-status-select"
-                    value={selectedStatusFilter}
-                    onChange={(e) => setSelectedStatusFilter(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
-                  >
-                    <option value="all">Tous les statuts</option>
-                    <option value="Open">À faire (Open)</option>
-                    <option value="In Progress">En cours (In Progress)</option>
-                    <option value="Blocked">Bloqué (Blocked)</option>
-                    <option value="Done">Terminé (Done)</option>
-                  </select>
-                </div>
-
-                {/* Réinitialisation */}
-                <div className="md:col-span-1 flex justify-end">
-                  {hasActiveFilters ? (
-                    <button
-                      id="reset-filters-btn"
-                      type="button"
-                      onClick={() => {
-                        setSearchQuery('');
-                        setSelectedProjectFilter('all');
-                        setSelectedStatusFilter('all');
-                      }}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-                      title="Réinitialiser les filtres"
-                    >
-                      <RotateCcw className="h-3.5 w-3.5" />
-                    </button>
-                  ) : (
-                    <div className="h-8 w-8 flex items-center justify-center text-slate-300">
-                      <Filter className="h-3.5 w-3.5" />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Indicateur de tâches en retard */}
-              {overdueCount > 0 && (
-                <div className="mt-3 flex items-center gap-2 rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700 border border-rose-100">
-                  <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
-                  <span>
-                    Attention : {overdueCount} tâche{overdueCount > 1 ? 's ont' : ' a'} dépassé leur date d&apos;échéance dans cet espace.
-                  </span>
-                </div>
-              )}
-            </div>
+            {/* BARRE DE RECHERCHE ET FILTRES MULTI-SÉLECTION ERGONOMIQUE */}
+            <TaskFilterBar
+              currentSpaceName={currentSpace.nom}
+              tasks={activeSpaceTasks}
+              projects={currentSpaceProjects}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              selectedProjectIds={selectedProjectIds}
+              onProjectSelectionChange={setSelectedProjectIds}
+              selectedStatuses={selectedStatuses}
+              onStatusSelectionChange={setSelectedStatuses}
+              onResetFilters={handleResetFilters}
+              overdueCount={overdueCount}
+            />
 
             {/* LISTE DES TÂCHES DE L'ESPACE */}
-            <div id="tasks-list-container" className="space-y-2.5">
+            <div id="tasks-list-container" className="space-y-1.5 sm:space-y-2">
               {sortedAndFilteredTasks.length === 0 ? (
                 <div
                   id="empty-tasks-placeholder"
@@ -1229,22 +1113,18 @@ export default function App() {
                   <h3 className="text-sm font-semibold text-slate-900">
                     {hasActiveFilters
                       ? 'Aucune tâche ne correspond à vos filtres'
-                      : `Aucune tâche dans l’espace « ${currentSpace.nom} »`}
+                      : `Aucune tâche active dans l’espace « ${currentSpace.nom} »`}
                   </h3>
                   <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
                     {hasActiveFilters
                       ? 'Essayez d’élargir vos termes de recherche ou de réinitialiser les filtres.'
-                      : 'Créez votre première tâche pour commencer à organiser ce contexte de travail.'}
+                      : 'Créez votre première tâche ou piochez dans votre Backlog pour alimenter ce tableau opérationnel.'}
                   </p>
                   <div className="mt-4 flex justify-center gap-2">
                     {hasActiveFilters ? (
                       <button
                         type="button"
-                        onClick={() => {
-                          setSearchQuery('');
-                          setSelectedProjectFilter('all');
-                          setSelectedStatusFilter('all');
-                        }}
+                        onClick={handleResetFilters}
                         className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
                       >
                         Effacer les filtres
@@ -1254,6 +1134,7 @@ export default function App() {
                         type="button"
                         onClick={() => {
                           setEditingTask(null);
+                          setTaskModalDefaultStatus('Open');
                           setIsTaskModalOpen(true);
                         }}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
@@ -1277,10 +1158,12 @@ export default function App() {
                       onStatusChange={handleStatusChangeRequest}
                       onEditTask={(t) => {
                         setEditingTask(t);
+                        setTaskModalDefaultStatus(t.statut);
                         setIsTaskModalOpen(true);
                       }}
                       onEdit={(t) => {
                         setEditingTask(t);
+                        setTaskModalDefaultStatus(t.statut);
                         setIsTaskModalOpen(true);
                       }}
                       onRequestDelete={handleRequestDeleteTask}
@@ -1299,9 +1182,9 @@ export default function App() {
             </div>
           </div>
         ) : (
-          /* PANNEAU DAILY REPORT DE L'ESPACE ACTIF */
+          /* PANNEAU DAILY REPORT DE L'ESPACE ACTIF (Exclut le Backlog) */
           <DailyReportPanel
-            tasks={currentSpaceTasks}
+            tasks={activeSpaceTasks}
             projects={currentSpaceProjects}
             activeSpace={currentSpace}
           />
@@ -1338,11 +1221,13 @@ export default function App() {
       <TaskFormModal
         isOpen={isTaskModalOpen}
         initialTask={editingTask}
+        defaultStatus={taskModalDefaultStatus}
         projects={currentSpaceProjects}
         onSave={handleSaveTask}
         onClose={() => {
           setIsTaskModalOpen(false);
           setEditingTask(null);
+          setTaskModalDefaultStatus('Open');
         }}
       />
 
