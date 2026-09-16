@@ -34,7 +34,18 @@ import {
   saveUserProjectsToStorage,
   exportDataAsJson,
   validateImportData,
+  getTodayDateString,
 } from './utils/storage';
+import { RecurringTaskTemplate } from './types/recurringTask';
+import { RecurringTasksModal } from './components/RecurringTasksModal';
+import {
+  subscribeToRecurringTemplates,
+  saveRecurringTemplate,
+  deleteRecurringTemplate,
+  processDueRecurringTasks,
+  getNextUpcomingRunDate,
+  formatRecurrenceLabel,
+} from './services/recurringTaskService';
 import {
   subscribeToUserData,
   initializeUserInitialDataIfEmpty,
@@ -107,6 +118,12 @@ export default function App() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Tache | null>(null);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+
+  // Modale Tâches récurrentes planifiées (inspiration Outlook)
+  const [recurringTemplates, setRecurringTemplates] = useState<RecurringTaskTemplate[]>([]);
+  const [isRecurringModalOpen, setIsRecurringModalOpen] = useState(false);
+  const hasCheckedRecurringRef = useRef<Record<string, string>>({});
+  const isProcessingRecurringRef = useRef<boolean>(false);
 
   // Modale Espaces de travail (Workspaces)
   const [isWorkspaceModalOpen, setIsWorkspaceModalOpen] = useState(false);
@@ -258,6 +275,22 @@ export default function App() {
     };
   }, [user, isApproved]);
 
+  // Abonnement aux modèles de tâches récurrentes de l'utilisateur
+  useEffect(() => {
+    if (!user || !isApproved) {
+      setRecurringTemplates([]);
+      return;
+    }
+
+    const unsubscribe = subscribeToRecurringTemplates(user.uid, (remoteTemplates) => {
+      setRecurringTemplates(remoteTemplates);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [user, isApproved]);
+
   // Sauvegardes miroir dans le localStorage
   useEffect(() => {
     if (user?.uid && spaces.length > 0) {
@@ -312,6 +345,69 @@ export default function App() {
     currentSpaceProjects.forEach((p) => map.set(p.id, p));
     return map;
   }, [currentSpaceProjects]);
+
+  // Modèles de tâches récurrentes de l'espace actif
+  const currentSpaceRecurringTemplates = useMemo(() => {
+    return recurringTemplates.filter((t) => (t.spaceId || DEFAULT_SPACE_ID) === currentSpace.id);
+  }, [recurringTemplates, currentSpace.id]);
+
+  const currentSpaceRecurringCount = currentSpaceRecurringTemplates.filter((t) => t.isActive).length;
+
+  // SERVICE DE GÉNÉRATION AUTOMATIQUE (Option A - Client-side)
+  // Exécuté au chargement de l'espace actif : génère les tâches échues et avance nextRunDate
+  useEffect(() => {
+    if (!user || !isApproved || !currentSpace.id || recurringTemplates.length === 0) return;
+
+    const todayStr = getTodayDateString();
+    const checkKey = `${currentSpace.id}-${todayStr}`;
+
+    // Verrouillage immédiat pour empêcher toute exécution concurrente ou multiple
+    if (hasCheckedRecurringRef.current[checkKey] || isProcessingRecurringRef.current) {
+      return;
+    }
+
+    hasCheckedRecurringRef.current[checkKey] = todayStr;
+    isProcessingRecurringRef.current = true;
+
+    const runAutoGeneration = async () => {
+      try {
+        const result = await processDueRecurringTasks({
+          userId: user.uid,
+          spaceId: currentSpace.id,
+          templates: recurringTemplates,
+          existingTasks: tasks,
+          onTaskCreated: async (newTask) => {
+            setTasks((prev) => {
+              if (prev.some((t) => t.id === newTask.id)) return prev;
+              return [newTask, ...prev];
+            });
+            if (!user.isLocalFallback) {
+              await saveTaskToFirestore(user.uid, newTask);
+            }
+          },
+          onTemplateUpdated: async (updatedTemplate) => {
+            setRecurringTemplates((prev) =>
+              prev.map((t) => (t.id === updatedTemplate.id ? updatedTemplate : t))
+            );
+          },
+        });
+
+        if (result.generatedCount > 0) {
+          showToast(
+            `⚡ ${result.generatedCount} tâche${
+              result.generatedCount > 1 ? 's' : ''
+            } récurrente${result.generatedCount > 1 ? 's ont été générées' : ' a été générée'} pour aujourd'hui !`
+          );
+        }
+      } catch (err) {
+        console.warn('Erreur lors de la génération automatique des tâches récurrentes :', err);
+      } finally {
+        isProcessingRecurringRef.current = false;
+      }
+    };
+
+    runAutoGeneration();
+  }, [user, isApproved, currentSpace.id, recurringTemplates, tasks]);
 
   // Déconnexion
   const handleLogout = async () => {
@@ -752,6 +848,97 @@ export default function App() {
     }
   };
 
+  // GESTION DES TÂCHES PLANIFIÉES & RÉCURRENTES
+  const handleSaveRecurringTemplate = async (template: RecurringTaskTemplate) => {
+    try {
+      setRecurringTemplates((prev) => {
+        const exists = prev.some((t) => t.id === template.id);
+        return exists
+          ? prev.map((t) => (t.id === template.id ? template : t))
+          : [...prev, template];
+      });
+      await saveRecurringTemplate(user?.uid, template);
+      showToast('Planification récurrente enregistrée.');
+    } catch (err) {
+      console.error('Erreur enregistrement récurrence:', err);
+      showToast('Erreur lors de la sauvegarde.', 'error');
+    }
+  };
+
+  const handleDeleteRecurringTemplate = async (templateId: string) => {
+    try {
+      setRecurringTemplates((prev) => prev.filter((t) => t.id !== templateId));
+      await deleteRecurringTemplate(user?.uid, templateId);
+      showToast('Planification supprimée.');
+    } catch (err) {
+      console.error('Erreur suppression récurrence:', err);
+      showToast('Erreur lors de la suppression.', 'error');
+    }
+  };
+
+  const handleManualTriggerRecurringTask = async (template: RecurringTaskTemplate) => {
+    try {
+      const todayStr = getTodayDateString();
+      const nowIso = new Date().toISOString();
+      const newTask: Tache = {
+        id: `rec-manual-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        userId: user?.uid,
+        spaceId: template.spaceId,
+        projetId: template.projectId || null,
+        titre: template.title,
+        description: template.description || '',
+        statut: 'Open',
+        dateEcheance: todayStr,
+        dateRealisation: null,
+        dateModification: nowIso,
+        ordre: 0,
+        commentaires: [
+          {
+            id: `comm-rec-${Date.now()}`,
+            texte: `⚡ Occurrence générée manuellement (Règle : ${formatRecurrenceLabel(
+              template.recurrenceType,
+              template.dayOfWeek,
+              template.dayOfMonth
+            )}).`,
+            date: nowIso,
+          },
+        ],
+      };
+
+      setTasks((prev) => [newTask, ...prev]);
+      if (user && !user.isLocalFallback) {
+        await saveTaskToFirestore(user.uid, newTask);
+      }
+
+      // Avancer la date de prochaine exécution au cycle suivant
+      const nextDate = getNextUpcomingRunDate(
+        template.nextRunDate,
+        template.recurrenceType,
+        todayStr,
+        {
+          dayOfWeek: template.dayOfWeek,
+          dayOfMonth: template.dayOfMonth,
+        }
+      );
+
+      const updatedTemplate: RecurringTaskTemplate = {
+        ...template,
+        nextRunDate: nextDate,
+        lastGeneratedDate: todayStr,
+      };
+
+      setRecurringTemplates((prev) =>
+        prev.map((t) => (t.id === template.id ? updatedTemplate : t))
+      );
+      await saveRecurringTemplate(user?.uid, updatedTemplate);
+
+      showToast(`Tâche « ${template.title} » générée immédiatement.`);
+    } catch (err) {
+      console.error('Erreur déclenchement manuel tâche récurrente:', err);
+      showToast('Erreur lors du déclenchement.', 'error');
+    }
+  };
+
   // Projets : Ajout dans l'espace actif
   const handleAddProject = (nom: string, couleur: string) => {
     const newProj: Projet = {
@@ -1028,12 +1215,14 @@ export default function App() {
         activeSpaceId={activeSpaceId}
         tasks={tasks}
         projects={projects}
+        recurringCount={currentSpaceRecurringCount}
         onSelectSpace={handleSelectSpace}
         onOpenWorkspaceModal={(mode) => {
           setWorkspaceModalInitialMode(mode);
           setIsWorkspaceModalOpen(true);
         }}
         onOpenProjectModal={() => setIsProjectModalOpen(true)}
+        onOpenRecurringModal={() => setIsRecurringModalOpen(true)}
         onOpenTaskModal={() => {
           setEditingTask(null);
           setTaskModalDefaultStatus(currentView === 'backlog' ? 'Backlog' : 'Open');
@@ -1271,6 +1460,20 @@ export default function App() {
         message={confirmModalConfig.message}
         onConfirm={confirmModalConfig.onConfirm}
         onCancel={() => setConfirmModalConfig((cfg) => ({ ...cfg, isOpen: false }))}
+      />
+
+      {/* MODALE GESTION DES TÂCHES PLANIFIÉES & RÉCURRENTES (Outlook style) */}
+      <RecurringTasksModal
+        isOpen={isRecurringModalOpen}
+        onClose={() => setIsRecurringModalOpen(false)}
+        templates={recurringTemplates}
+        activeSpaceId={currentSpace.id}
+        activeSpaceName={currentSpace.nom}
+        projects={currentSpaceProjects}
+        userId={user?.uid}
+        onSaveTemplate={handleSaveRecurringTemplate}
+        onDeleteTemplate={handleDeleteRecurringTemplate}
+        onManualTrigger={handleManualTriggerRecurringTask}
       />
     </div>
   );

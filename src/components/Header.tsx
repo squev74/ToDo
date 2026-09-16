@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   Shield,
   FolderPlus,
+  CalendarClock,
   Download,
   Upload,
   Plus,
@@ -23,9 +24,11 @@ export interface HeaderProps {
   activeSpaceId: string;
   tasks: Tache[];
   projects: Projet[];
+  recurringCount?: number;
   onSelectSpace: (spaceId: string) => void;
   onOpenWorkspaceModal: (mode: 'list' | 'create') => void;
   onOpenProjectModal: () => void;
+  onOpenRecurringModal?: () => void;
   onOpenTaskModal: () => void;
   onExportJson: () => void;
   onImportJson: () => void;
@@ -39,9 +42,11 @@ export const Header: React.FC<HeaderProps> = ({
   activeSpaceId,
   tasks,
   projects,
+  recurringCount,
   onSelectSpace,
   onOpenWorkspaceModal,
   onOpenProjectModal,
+  onOpenRecurringModal,
   onOpenTaskModal,
   onExportJson,
   onImportJson,
@@ -149,6 +154,25 @@ export const Header: React.FC<HeaderProps> = ({
                 {currentSpaceProjects.length}
               </span>
             </button>
+
+            {/* Bouton Tâches planifiées et récurrentes (inspiration Outlook) */}
+            {onOpenRecurringModal && (
+              <button
+                id="open-recurring-modal-btn"
+                type="button"
+                onClick={onOpenRecurringModal}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-indigo-50/70 hover:text-indigo-900 hover:border-indigo-200 transition-colors shadow-2xs"
+                title="Gérer les tâches récurrentes planifiées (inspiration Outlook)"
+              >
+                <CalendarClock className="h-4 w-4 text-indigo-600" />
+                <span className="hidden sm:inline">Récurrences</span>
+                {recurringCount !== undefined && recurringCount > 0 && (
+                  <span className="rounded-full bg-indigo-50 px-1.5 py-0.2 text-[11px] font-bold text-indigo-700 border border-indigo-200">
+                    {recurringCount}
+                  </span>
+                )}
+              </button>
+            )}
 
             {/* Boutons Exporter / Importer JSON */}
             <div className="flex items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-2xs">

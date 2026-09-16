@@ -65,3 +65,5 @@ export interface AppDataExport {
   taches: Tache[];
 }
 
+export * from './types/recurringTask';
+

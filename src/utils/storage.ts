@@ -2,13 +2,34 @@ import { Tache, Projet, Espace, AppDataExport, UserProfile } from '../types';
 
 export const DEFAULT_SPACE_ID = 'space-default';
 
-// Helper pour formater la date du jour YYYY-MM-DD
-export function getTodayDateString(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+// Helper pour formater une date locale en YYYY-MM-DD
+export function formatDateToLocalYMD(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+// Helper pour formater la date du jour YYYY-MM-DD (fuseau local)
+export function getTodayDateString(): string {
+  return formatDateToLocalYMD(new Date());
+}
+
+// Helper pour obtenir la date de demain YYYY-MM-DD (fuseau local)
+export function getTomorrowDateString(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return formatDateToLocalYMD(d);
+}
+
+// Helper pour obtenir le prochain jour ouvré (Lundi au Vendredi) YYYY-MM-DD
+export function getNextWorkdayDateString(from?: Date): string {
+  const d = from ? new Date(from.getTime()) : new Date();
+  d.setDate(d.getDate() + 1);
+  while (d.getDay() === 0 || d.getDay() === 6) {
+    d.setDate(d.getDate() + 1);
+  }
+  return formatDateToLocalYMD(d);
 }
 
 // Espaces de travail par défaut

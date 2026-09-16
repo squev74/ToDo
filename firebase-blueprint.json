@@ -63,6 +63,27 @@
         "commentaires": { "type": "array" }
       },
       "required": ["id", "titre", "statut", "ordre", "spaceId"]
+    },
+    "RecurringTaskTemplate": {
+      "title": "RecurringTaskTemplate",
+      "description": "Modèle de tâche récurrente planifiée (inspiration Outlook)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "spaceId": { "type": "string" },
+        "projectId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "recurrenceType": { "type": "string", "enum": ["daily", "weekly", "monthly", "workdays"] },
+        "dayOfWeek": { "type": "number" },
+        "dayOfMonth": { "type": "number" },
+        "nextRunDate": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "lastGeneratedDate": { "type": "string" }
+      },
+      "required": ["id", "spaceId", "title", "recurrenceType", "nextRunDate", "isActive"]
     }
   },
   "firestore": {
@@ -81,6 +102,10 @@
     "/users/{userId}/tasks/{taskId}": {
       "schema": "Task",
       "description": "Tâches de l'utilisateur"
+    },
+    "/users/{userId}/recurringTemplates/{templateId}": {
+      "schema": "RecurringTaskTemplate",
+      "description": "Modèles de tâches récurrentes de l'utilisateur"
     }
   }
 }
