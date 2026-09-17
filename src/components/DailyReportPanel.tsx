@@ -20,6 +20,7 @@ interface DailyReportPanelProps {
   tasks: Tache[];
   projects: Projet[];
   activeSpace?: Espace;
+  onOpenActivityReportModal?: (startDate?: string, endDate?: string) => void;
 }
 
 function formatLocalDate(d: Date): string {
@@ -29,7 +30,12 @@ function formatLocalDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, projects, activeSpace }) => {
+export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
+  tasks,
+  projects,
+  activeSpace,
+  onOpenActivityReportModal,
+}) => {
   const todayStr = useMemo(() => getTodayDateString(), []);
   const ActiveSpaceIcon = activeSpace ? getWorkspaceIconComponent(activeSpace.icone) : null;
 
@@ -334,22 +340,22 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
       {/* En-tête avec Sélecteur de plage de dates et actions rapides */}
       <div
         id="daily-report-header"
-        className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs"
+        className="rounded-2xl border border-[#F0EFEB] bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
       >
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#6B8E78]/10 text-[#6B8E78]">
                 <CalendarRange className="h-4 w-4" />
               </span>
-              <h2 className="text-base font-bold text-slate-900">
+              <h2 className="text-base font-normal tracking-wide text-[#1A1D1A]">
                 Rapport d&apos;Activité & Suivi
               </h2>
               {activeSpace && ActiveSpaceIcon && (
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-[#F0EFEB] bg-[#F9F8F6] px-2.5 py-1 text-xs font-medium text-[#737873]">
                   <span
                     className="flex h-4 w-4 items-center justify-center rounded text-white"
-                    style={{ backgroundColor: activeSpace.couleur || '#6366f1' }}
+                    style={{ backgroundColor: activeSpace.couleur || '#6B8E78' }}
                   >
                     <ActiveSpaceIcon className="h-2.5 w-2.5 stroke-[2.5]" />
                   </span>
@@ -357,7 +363,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                 </span>
               )}
             </div>
-            <p className="mt-1 text-xs text-slate-500 capitalize">
+            <p className="mt-1 text-xs text-[#737873] capitalize font-light">
               {isSingleDay ? (
                 <>
                   {formatReadableDateLong(effectiveStart)}{' '}
@@ -365,8 +371,8 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                 </>
               ) : (
                 <>
-                  Période du <strong className="text-slate-700">{formatFrenchDate(effectiveStart)}</strong> au{' '}
-                  <strong className="text-slate-700">{formatFrenchDate(effectiveEnd)}</strong>
+                  Période du <strong className="text-[#1A1D1A] font-medium">{formatFrenchDate(effectiveStart)}</strong> au{' '}
+                  <strong className="text-[#1A1D1A] font-medium">{formatFrenchDate(effectiveEnd)}</strong>
                 </>
               )}
             </p>
@@ -377,16 +383,16 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
             {/* Raccourcis de dates */}
             <div
               id="report-quick-presets"
-              className="flex items-center rounded-lg border border-slate-300 bg-slate-50 p-0.5 shadow-2xs"
+              className="flex items-center rounded-xl border border-[#F0EFEB] bg-[#F9F8F6] p-0.5"
             >
               <button
                 id="preset-today-btn"
                 type="button"
                 onClick={() => applyPreset('today')}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
                   activePreset === 'today'
-                    ? 'bg-white text-indigo-600 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:bg-white/80 hover:text-slate-900'
+                    ? 'bg-white text-[#1A1D1A] shadow-[0_1px_4px_rgba(0,0,0,0.04)]'
+                    : 'text-[#737873] hover:text-[#1A1D1A]'
                 }`}
               >
                 Aujourd&apos;hui
@@ -395,10 +401,10 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                 id="preset-last7days-btn"
                 type="button"
                 onClick={() => applyPreset('last7days')}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
                   activePreset === 'last7days'
-                    ? 'bg-white text-indigo-600 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:bg-white/80 hover:text-slate-900'
+                    ? 'bg-white text-[#1A1D1A] shadow-[0_1px_4px_rgba(0,0,0,0.04)]'
+                    : 'text-[#737873] hover:text-[#1A1D1A]'
                 }`}
               >
                 Les 7 derniers jours
@@ -407,44 +413,57 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                 id="preset-thisMonth-btn"
                 type="button"
                 onClick={() => applyPreset('thisMonth')}
-                className={`rounded-md px-3 py-1.5 text-xs font-semibold transition-all ${
+                className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
                   activePreset === 'thisMonth'
-                    ? 'bg-white text-indigo-600 shadow-2xs font-bold'
-                    : 'text-slate-600 hover:bg-white/80 hover:text-slate-900'
+                    ? 'bg-white text-[#1A1D1A] shadow-[0_1px_4px_rgba(0,0,0,0.04)]'
+                    : 'text-[#737873] hover:text-[#1A1D1A]'
                 }`}
               >
                 Ce mois-ci
               </button>
             </div>
 
-            {/* Boutons Exporter et Copier */}
+            {/* Boutons Exporter, Copier et Rapport IA */}
             <div className="flex items-center gap-1.5">
+              {onOpenActivityReportModal && (
+                <button
+                  id="open-ai-report-from-panel-btn"
+                  type="button"
+                  onClick={() => onOpenActivityReportModal(effectiveStart, effectiveEnd)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#6B8E78] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#5d7c68] active:scale-[0.99] transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                  title="Générer un compte-rendu synthétique professionnel avec l'IA Gemini pour cette période"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Rapport IA</span>
+                </button>
+              )}
+
               <button
                 id="export-filtered-report-btn"
                 type="button"
                 onClick={handleExportFilteredReport}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#F0EFEB] bg-white px-3 py-1.5 text-xs font-medium text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
                 title="Exporter ce rapport filtré en fichier JSON"
               >
-                <Download className="h-3.5 w-3.5 text-indigo-600" />
-                <span className="hidden sm:inline">Exporter rapport</span>
+                <Download className="h-3.5 w-3.5 text-[#5B7083]" />
+                <span className="hidden sm:inline">Exporter</span>
               </button>
 
               <button
                 id="copy-summary-report-btn"
                 type="button"
                 onClick={handleCopySummary}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#F0EFEB] bg-white px-2.5 py-1.5 text-xs font-medium text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
                 title="Copier le résumé dans le presse-papiers"
               >
                 {copiedSummary ? (
                   <>
-                    <Check className="h-3.5 w-3.5 text-emerald-600" />
-                    <span className="text-emerald-600 hidden sm:inline">Copié !</span>
+                    <Check className="h-3.5 w-3.5 text-[#6B8E78]" />
+                    <span className="text-[#6B8E78] hidden sm:inline">Copié !</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="h-3.5 w-3.5 text-slate-500" />
+                    <Copy className="h-3.5 w-3.5 text-[#737873]" />
                     <span className="hidden sm:inline">Copier</span>
                   </>
                 )}
@@ -454,11 +473,11 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
         </div>
 
         {/* Champs de sélection Date de début et Date de fin */}
-        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="mt-4 pt-4 border-t border-[#F0EFEB] flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="flex-1">
             <label
               htmlFor="report-start-date-input"
-              className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1"
+              className="block text-xs font-medium text-[#737873] mb-1"
             >
               Date de début
             </label>
@@ -468,19 +487,19 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                 type="date"
                 value={startDate}
                 onChange={(e) => handleStartDateChange(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+                className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3 py-1.5 text-xs font-normal text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
               />
             </div>
           </div>
 
-          <div className="hidden sm:flex items-center justify-center pt-5 text-slate-400">
+          <div className="hidden sm:flex items-center justify-center pt-5 text-[#737873]/50">
             <ArrowRight className="h-4 w-4" />
           </div>
 
           <div className="flex-1">
             <label
               htmlFor="report-end-date-input"
-              className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1"
+              className="block text-xs font-medium text-[#737873] mb-1"
             >
               Date de fin
             </label>
@@ -490,7 +509,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                 type="date"
                 value={endDate}
                 onChange={(e) => handleEndDateChange(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-800 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+                className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3 py-1.5 text-xs font-normal text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
               />
             </div>
           </div>
@@ -500,14 +519,14 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div
             id="metric-completed-card"
-            className="flex items-center gap-3 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3"
+            className="flex items-center gap-3 rounded-xl border border-[#6B8E78]/20 bg-[#6B8E78]/5 p-3.5"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#6B8E78]/15 text-[#4e634a]">
               <CheckCircle2 className="h-4.5 w-4.5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-emerald-900">Tâches clôturées</p>
-              <p className="text-lg font-bold text-emerald-700">
+              <p className="text-xs font-medium text-[#4e634a]">Tâches clôturées</p>
+              <p className="text-lg font-medium text-[#4e634a]">
                 {completedTasksInPeriod.length}
               </p>
             </div>
@@ -515,14 +534,14 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
 
           <div
             id="metric-blocked-card"
-            className="flex items-center gap-3 rounded-lg border border-rose-100 bg-rose-50/50 p-3"
+            className="flex items-center gap-3 rounded-xl border border-[#C89B7B]/25 bg-[#C89B7B]/10 p-3.5"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-700">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#C89B7B]/20 text-[#966847]">
               <AlertOctagon className="h-4.5 w-4.5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-rose-900">Tâches bloquées</p>
-              <p className="text-lg font-bold text-rose-700">
+              <p className="text-xs font-medium text-[#966847]">Tâches bloquées</p>
+              <p className="text-lg font-medium text-[#966847]">
                 {blockedTasksInPeriod.length}
               </p>
             </div>
@@ -530,14 +549,14 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
 
           <div
             id="metric-comments-card"
-            className="flex items-center gap-3 rounded-lg border border-blue-100 bg-blue-50/50 p-3"
+            className="flex items-center gap-3 rounded-xl border border-[#5B7083]/20 bg-[#5B7083]/5 p-3.5"
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#5B7083]/15 text-[#5B7083]">
               <MessageSquare className="h-4.5 w-4.5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-blue-900">Notes & commentaires</p>
-              <p className="text-lg font-bold text-blue-700">{commentsInPeriod.length}</p>
+              <p className="text-xs font-medium text-[#5B7083]">Notes & commentaires</p>
+              <p className="text-lg font-medium text-[#5B7083]">{commentsInPeriod.length}</p>
             </div>
           </div>
         </div>
@@ -548,30 +567,30 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
         {/* Volet 1: Tâches clôturées ("Done") */}
         <div
           id="report-completed-tasks-container"
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col"
+          className="rounded-2xl border border-[#F0EFEB] bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex flex-col"
         >
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#F0EFEB] mb-4">
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              <h3 className="text-sm font-bold text-slate-900">
+              <CheckCircle2 className="h-4 w-4 text-[#6B8E78]" />
+              <h3 className="text-sm font-medium text-[#1A1D1A]">
                 Tâches clôturées ({completedTasksInPeriod.length})
               </h3>
             </div>
-            <span className="text-[11px] font-medium text-slate-400">
-              Horodatage date de réalisation
+            <span className="text-[11px] font-medium text-[#737873]">
+              Date de réalisation
             </span>
           </div>
 
           {completedTasksInPeriod.length === 0 ? (
             <div
               id="empty-completed-tasks-message"
-              className="flex flex-col items-center justify-center py-12 text-center text-slate-400 my-auto"
+              className="flex flex-col items-center justify-center py-12 text-center text-[#737873] my-auto"
             >
-              <Sparkles className="h-7 w-7 text-slate-300 mb-2" />
-              <p className="text-xs font-semibold text-slate-700">
+              <Sparkles className="h-7 w-7 text-[#737873]/40 mb-2" />
+              <p className="text-xs font-medium text-[#1A1D1A]">
                 Aucune tâche clôturée sur cette période
               </p>
-              <p className="text-[11px] text-slate-400 mt-1 max-w-xs">
+              <p className="text-[11px] text-[#737873] mt-1 max-w-xs font-light">
                 Aucune tâche n&apos;a été finalisée entre le {formatFrenchDate(effectiveStart)} et le{' '}
                 {formatFrenchDate(effectiveEnd)}.
               </p>
@@ -584,22 +603,22 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                   <div
                     key={task.id}
                     id={`report-task-${task.id}`}
-                    className="rounded-lg border border-slate-200 bg-slate-50/50 p-3 hover:border-slate-300 transition-colors"
+                    className="rounded-xl border border-[#F0EFEB] bg-[#F9F8F6]/70 p-3 hover:bg-[#F9F8F6] transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <h4 className="text-xs font-semibold text-slate-900 line-through decoration-emerald-500">
+                      <h4 className="text-xs font-medium text-[#737873] line-through decoration-[#A3B19B]">
                         {task.titre}
                       </h4>
                       {task.dateRealisation && (
-                        <span className="inline-flex items-center gap-1 rounded bg-emerald-100/80 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 shrink-0">
-                          <Clock className="h-3 w-3" />
-                          {formatItemTimestamp(task.dateRealisation)}
+                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500 text-white px-2 py-0.5 text-[11px] font-medium shrink-0 shadow-2xs">
+                          <CheckCircle2 className="h-3 w-3" />
+                          <span>{formatItemTimestamp(task.dateRealisation)}</span>
                         </span>
                       )}
                     </div>
 
                     {task.description && (
-                      <p className="mt-1 text-xs text-slate-500 line-clamp-2">
+                      <p className="mt-1 text-xs text-[#737873] line-clamp-2 font-light">
                         {task.description}
                       </p>
                     )}
@@ -607,7 +626,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                     <div className="mt-2 flex items-center gap-2 text-xs">
                       {project && (
                         <span
-                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.2 text-[10px] font-medium border"
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium border"
                           style={{
                             backgroundColor: `${project.couleur}10`,
                             color: project.couleur,
@@ -618,7 +637,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                           {project.nom}
                         </span>
                       )}
-                      <span className="text-[10px] text-slate-400">
+                      <span className="text-[10px] text-[#737873]">
                         {task.commentaires?.length || 0} note(s)
                       </span>
                     </div>
@@ -632,16 +651,16 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
         {/* Volet 2: Tâches bloquées ("Blocked") */}
         <div
           id="report-blocked-tasks-container"
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col"
+          className="rounded-2xl border border-[#F0EFEB] bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex flex-col"
         >
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#F0EFEB] mb-4">
             <div className="flex items-center gap-2">
-              <AlertOctagon className="h-4 w-4 text-rose-600" />
-              <h3 className="text-sm font-bold text-slate-900">
+              <AlertOctagon className="h-4 w-4 text-[#C89B7B]" />
+              <h3 className="text-sm font-medium text-[#1A1D1A]">
                 Tâches bloquées ({blockedTasksInPeriod.length})
               </h3>
             </div>
-            <span className="text-[11px] font-medium text-slate-400">
+            <span className="text-[11px] font-medium text-[#737873]">
               Points d&apos;attention
             </span>
           </div>
@@ -649,14 +668,14 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
           {blockedTasksInPeriod.length === 0 ? (
             <div
               id="empty-blocked-tasks-message"
-              className="flex flex-col items-center justify-center py-12 text-center text-slate-400 my-auto"
+              className="flex flex-col items-center justify-center py-12 text-center text-[#737873] my-auto"
             >
-              <CheckCircle2 className="h-7 w-7 text-emerald-300 mb-2" />
-              <p className="text-xs font-semibold text-slate-700">
+              <CheckCircle2 className="h-7 w-7 text-[#6B8E78]/50 mb-2" />
+              <p className="text-xs font-medium text-[#1A1D1A]">
                 Aucune tâche bloquée sur cette période
               </p>
-              <p className="text-[11px] text-slate-400 mt-1 max-w-xs">
-                Aucun blocage n&apos;a été signalé ou modifié entre le {formatFrenchDate(effectiveStart)} et le{' '}
+              <p className="text-[11px] text-[#737873] mt-1 max-w-xs font-light">
+                Aucun blocage n&apos;a été signalé entre le {formatFrenchDate(effectiveStart)} et le{' '}
                 {formatFrenchDate(effectiveEnd)}.
               </p>
             </div>
@@ -672,19 +691,19 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                   <div
                     key={task.id}
                     id={`report-blocked-task-${task.id}`}
-                    className="rounded-lg border border-rose-200 bg-rose-50/40 p-3 hover:border-rose-300 transition-colors"
+                    className="rounded-xl border border-[#C89B7B]/30 bg-[#C89B7B]/10 p-3 hover:bg-[#C89B7B]/15 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <h4 className="text-xs font-semibold text-slate-900">
                         {task.titre}
                       </h4>
-                      <span className="inline-flex items-center gap-1 rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800 shrink-0">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-red-500 text-white px-2 py-0.5 text-xs font-bold shrink-0 shadow-2xs">
                         Bloqué
                       </span>
                     </div>
 
                     {lastBlockedComment && (
-                      <p className="mt-1.5 rounded-md bg-white/80 p-2 text-xs font-medium text-rose-900 border border-rose-100 leading-snug">
+                      <p className="mt-1.5 rounded-lg bg-white/90 p-2 text-xs font-normal text-[#966847] border border-[#C89B7B]/20 leading-snug">
                         {lastBlockedComment}
                       </p>
                     )}
@@ -692,7 +711,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                     <div className="mt-2 flex items-center justify-between gap-2 text-xs">
                       {project ? (
                         <span
-                          className="inline-flex items-center gap-1 rounded px-1.5 py-0.2 text-[10px] font-medium border"
+                          className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-medium border"
                           style={{
                             backgroundColor: `${project.couleur}10`,
                             color: project.couleur,
@@ -703,11 +722,11 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                           {project.nom}
                         </span>
                       ) : (
-                        <span className="text-[10px] text-slate-400">Sans projet</span>
+                        <span className="text-[10px] text-[#737873]">Sans projet</span>
                       )}
                       {task.dateModification && (
-                        <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
-                          <Clock className="h-3 w-3 text-slate-400" />
+                        <span className="inline-flex items-center gap-1 text-[10px] text-[#737873]">
+                          <Clock className="h-3 w-3 text-[#737873]" />
                           {formatItemTimestamp(task.dateModification)}
                         </span>
                       )}
@@ -722,16 +741,16 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
         {/* Volet 3: Commentaires rédigés sur l'intervalle */}
         <div
           id="report-comments-container"
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col"
+          className="rounded-2xl border border-[#F0EFEB] bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex flex-col"
         >
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+          <div className="flex items-center justify-between pb-3 border-b border-[#F0EFEB] mb-4">
             <div className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4 text-blue-600" />
-              <h3 className="text-sm font-bold text-slate-900">
+              <MessageSquare className="h-4 w-4 text-[#5B7083]" />
+              <h3 className="text-sm font-medium text-[#1A1D1A]">
                 Notes & Suivi ({commentsInPeriod.length})
               </h3>
             </div>
-            <span className="text-[11px] font-medium text-slate-400">
+            <span className="text-[11px] font-medium text-[#737873]">
               Historique transverse
             </span>
           </div>
@@ -739,13 +758,13 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
           {commentsInPeriod.length === 0 ? (
             <div
               id="empty-comments-message"
-              className="flex flex-col items-center justify-center py-12 text-center text-slate-400 my-auto"
+              className="flex flex-col items-center justify-center py-12 text-center text-[#737873] my-auto"
             >
-              <MessageSquare className="h-7 w-7 text-slate-300 mb-2" />
-              <p className="text-xs font-semibold text-slate-700">
+              <MessageSquare className="h-7 w-7 text-[#737873]/40 mb-2" />
+              <p className="text-xs font-medium text-[#1A1D1A]">
                 Aucune note saisie sur cette période
               </p>
-              <p className="text-[11px] text-slate-400 mt-1 max-w-xs">
+              <p className="text-[11px] text-[#737873] mt-1 max-w-xs font-light">
                 Aucun commentaire n&apos;a été consigné entre le {formatFrenchDate(effectiveStart)} et le{' '}
                 {formatFrenchDate(effectiveEnd)}.
               </p>
@@ -756,22 +775,22 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({ tasks, proje
                 <div
                   key={item.id}
                   id={`report-comment-${item.id}`}
-                  className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs space-y-1.5 hover:border-slate-300 transition-colors"
+                  className="rounded-xl border border-[#F0EFEB] bg-white p-3 space-y-1.5 hover:border-[#E2DFD8] transition-colors"
                 >
                   <div className="flex items-center justify-between gap-2 text-xs">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <ArrowRight className="h-3 w-3 text-slate-400 shrink-0" />
-                      <span className="font-semibold text-slate-800 truncate" title={item.taskTitle}>
+                      <ArrowRight className="h-3 w-3 text-[#737873] shrink-0" />
+                      <span className="font-medium text-[#1A1D1A] truncate" title={item.taskTitle}>
                         {item.taskTitle}
                       </span>
                     </div>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 shrink-0">
-                      <Clock className="h-3 w-3 text-slate-400" />
+                    <span className="inline-flex items-center gap-1 text-[10px] font-normal text-[#737873] shrink-0">
+                      <Clock className="h-3 w-3 text-[#737873]" />
                       {formatItemTimestamp(item.date)}
                     </span>
                   </div>
 
-                  <p className="rounded-md bg-slate-50 p-2 text-xs text-slate-700 leading-relaxed whitespace-pre-wrap border border-slate-100">
+                  <p className="rounded-lg bg-[#F9F8F6] p-2 text-xs text-[#1A1D1A] leading-relaxed whitespace-pre-wrap border border-[#F0EFEB] font-light">
                     {item.texte}
                   </p>
                 </div>

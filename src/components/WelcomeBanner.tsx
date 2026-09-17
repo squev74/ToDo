@@ -17,14 +17,14 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
   return (
     <div
       id="welcome-banner"
-      className="relative rounded-xl border border-indigo-200/90 bg-gradient-to-r from-indigo-50/90 via-blue-50/70 to-slate-50 p-5 shadow-xs transition-all"
+      className="relative rounded-2xl border border-[#F0EFEB] bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-all"
     >
       {/* Bouton fermeture */}
       <button
         id="welcome-banner-close-btn"
         type="button"
         onClick={onDismiss}
-        className="absolute top-3.5 right-3.5 rounded-lg p-1.5 text-slate-400 hover:bg-indigo-100/60 hover:text-slate-700 transition-colors"
+        className="absolute top-4 right-4 rounded-xl p-1.5 text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
         title="Masquer ce message de bienvenue"
       >
         <X className="h-4 w-4" />
@@ -33,36 +33,36 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
       <div className="flex items-start gap-3.5">
         <div
           id="welcome-banner-icon"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#6B8E78]/10 text-[#6B8E78]"
         >
           <Sparkles className="h-5 w-5" />
         </div>
 
         <div className="flex-1 pr-6">
           <div className="flex items-center gap-2">
-            <h3 id="welcome-banner-title" className="text-sm font-bold text-slate-900">
-              Bienvenue sur votre To-Do List !
+            <h3 id="welcome-banner-title" className="text-sm font-normal tracking-wide text-[#1A1D1A]">
+              Bienvenue sur votre espace de sérénité & de productivité
             </h3>
-            <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 border border-indigo-200">
-              Nouveau
+            <span className="rounded-lg bg-[#6B8E78]/10 px-2 py-0.5 text-[10px] font-medium text-[#6B8E78] border border-[#6B8E78]/20">
+              Guide
             </span>
           </div>
 
-          <p className="mt-1.5 text-xs text-slate-600 leading-relaxed max-w-3xl">
-            Cette application est un gestionnaire de tâches (To-Do List) complet et autonome. Pour commencer à l&apos;utiliser :
+          <p className="mt-1.5 text-xs text-[#737873] leading-relaxed max-w-3xl font-light">
+            Cette application est un gestionnaire de tâches ergonomique et épuré. Pour commencer :
           </p>
 
-          <ul className="mt-2.5 space-y-1.5 text-xs text-slate-700">
+          <ul className="mt-2.5 space-y-1.5 text-xs text-[#737873] font-light">
             <li className="flex items-start gap-2">
-              <CheckSquare className="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
+              <CheckSquare className="h-3.5 w-3.5 text-[#6B8E78] shrink-0 mt-0.5" />
               <span>
-                <strong>Ajoutez vos tâches :</strong> Cliquez sur le bouton <strong>« Nouvelle tâche »</strong> pour définir vos objectifs, échéances et projets.
+                <strong className="text-[#1A1D1A] font-medium">Ajoutez vos tâches :</strong> Cliquez sur <strong className="text-[#1A1D1A] font-medium">« Nouvelle tâche »</strong> pour définir vos objectifs, échéances et projets.
               </span>
             </li>
             <li className="flex items-start gap-2">
-              <CheckSquare className="h-3.5 w-3.5 text-indigo-600 shrink-0 mt-0.5" />
+              <CheckSquare className="h-3.5 w-3.5 text-[#6B8E78] shrink-0 mt-0.5" />
               <span>
-                <strong>Nettoyez les exemples :</strong> Supprimez ou adaptez les tâches d&apos;exemples pré-chargées pour faire place à votre propre organisation.
+                <strong className="text-[#1A1D1A] font-medium">Nettoyez les exemples :</strong> Retirez les tâches de démonstration pour laisser place à votre organisation personnelle.
               </span>
             </li>
           </ul>
@@ -73,7 +73,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
               id="welcome-create-task-btn"
               type="button"
               onClick={onNewTaskClick}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 shadow-xs transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#6B8E78] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#5d7c68] shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-colors"
             >
               <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
               <span>Ajouter une tâche</span>
@@ -84,9 +84,9 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
                 id="welcome-clear-examples-btn"
                 type="button"
                 onClick={onClearExamplesClick}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#F0EFEB] bg-white px-3 py-1.5 text-xs font-medium text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
               >
-                <Trash2 className="h-3.5 w-3.5 text-rose-500" />
+                <Trash2 className="h-3.5 w-3.5 text-[#C89B7B]" />
                 <span>Enlever les tâches d&apos;exemples</span>
               </button>
             )}
@@ -95,7 +95,7 @@ export const WelcomeBanner: React.FC<WelcomeBannerProps> = ({
               id="welcome-dismiss-btn"
               type="button"
               onClick={onDismiss}
-              className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+              className="rounded-xl px-3 py-1.5 text-xs font-medium text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
             >
               J&apos;ai compris, masquer
             </button>

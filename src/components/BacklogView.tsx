@@ -144,38 +144,36 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
   };
 
   return (
-    <div id="backlog-view-container" className="space-y-6">
+    <div id="backlog-view-container" className="space-y-5">
       {/* En-tête informatif du Backlog */}
       <div
         id="backlog-header-banner"
-        className="rounded-2xl border border-slate-200/80 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 p-6 text-white shadow-sm"
+        className="rounded-2xl border border-[#F0EFEB] bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white backdrop-blur-xs border border-white/10">
-                <Inbox className="h-5 w-5 text-indigo-200" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#5B7083]/10 text-[#5B7083]">
+                <Inbox className="h-5 w-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-xl font-bold tracking-tight text-white">
+                  <h2 className="text-lg font-normal tracking-wide text-[#1A1D1A]">
                     Backlog des tâches
                   </h2>
-                  <span className="inline-flex items-center rounded-full bg-indigo-500/20 px-2.5 py-0.5 text-xs font-semibold text-indigo-200 border border-indigo-400/30">
+                  <span className="inline-flex items-center rounded-lg bg-[#5B7083]/10 px-2.5 py-0.5 text-xs font-medium text-[#5B7083] border border-[#5B7083]/20">
                     {backlogTasks.length} en attente
                   </span>
                 </div>
                 {activeSpace && (
-                  <p className="text-xs text-slate-300">
-                    Espace actif : <strong className="text-white">{activeSpace.nom}</strong>
+                  <p className="text-xs text-[#737873]">
+                    Espace actif : <strong className="text-[#1A1D1A] font-medium">{activeSpace.nom}</strong>
                   </p>
                 )}
               </div>
             </div>
-            <p className="text-xs text-slate-300 max-w-2xl leading-relaxed pt-1">
-              Ce réservoir conserve vos idées, fonctionnalités et tâches en attente de cadrage.
-              Elles n'encombrent pas le tableau de bord actif. Dès qu'une tâche est prête,
-              cliquez sur <strong className="text-indigo-200">« Passer à faire »</strong> pour l'intégrer au Kanban opérationnel.
+            <p className="text-xs text-[#737873] max-w-2xl leading-relaxed pt-1 font-light">
+              Ce réservoir conserve vos idées, fonctionnalités et tâches en attente de cadrage sans encombrer votre tableau opérationnel. Dès qu&apos;une tâche est prête, passez-la à l&apos;état actif pour l&apos;intégrer au flux.
             </p>
           </div>
 
@@ -184,9 +182,9 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
               id="backlog-open-create-modal-btn"
               type="button"
               onClick={onOpenCreateModal}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-500 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-400 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#6B8E78] px-4 py-2 text-xs font-medium text-white hover:bg-[#5d7c68] active:scale-[0.99] transition-all shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-4 w-4 stroke-[2.5]" />
               <span>Créer une tâche détaillée</span>
             </button>
           </div>
@@ -196,7 +194,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
       {/* Barre d'ajout rapide au Backlog */}
       <div
         id="backlog-quick-add-bar"
-        className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs"
+        className="rounded-2xl border border-[#F0EFEB] bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
       >
         <form onSubmit={handleQuickAddSubmit} className="flex flex-col sm:flex-row gap-2.5">
           <div className="relative flex-1">
@@ -206,7 +204,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
               value={quickTitle}
               onChange={(e) => setQuickTitle(e.target.value)}
               placeholder="Ajouter une idée ou tâche en attente dans le Backlog..."
-              className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3.5 py-2 text-xs text-[#1A1D1A] placeholder:text-[#737873]/50 focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
             />
           </div>
 
@@ -215,7 +213,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
               id="backlog-quick-project-select"
               value={quickProjectId}
               onChange={(e) => setQuickProjectId(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-700 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3 py-2 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
             >
               <option value="">Sans projet assigné</option>
               {projects.map((p) => (
@@ -230,7 +228,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
             id="backlog-quick-add-submit-btn"
             type="submit"
             disabled={!quickTitle.trim()}
-            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-800 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#1A1D1A] px-4 py-2 text-xs font-medium text-white hover:bg-[#2c302c] disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.99] transition-all shrink-0"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>Ajouter au Backlog</span>
@@ -241,19 +239,19 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
       {/* Barre de filtres interne au Backlog */}
       <div
         id="backlog-filters-bar"
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-xs"
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-2xl border border-[#F0EFEB] bg-white p-3 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
       >
         <div className="flex flex-1 flex-col sm:flex-row gap-2.5 items-center">
           {/* Recherche */}
           <div className="relative w-full sm:w-72">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#737873]" />
             <input
               id="backlog-search-input"
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher dans le Backlog..."
-              className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-[#F0EFEB] bg-white py-1.5 pl-8 pr-3 text-xs text-[#1A1D1A] placeholder:text-[#737873]/50 focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
             />
           </div>
 
@@ -263,7 +261,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
               id="backlog-project-filter"
               value={selectedProjectFilter}
               onChange={(e) => setSelectedProjectFilter(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3 py-1.5 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
             >
               <option value="all">Tous les projets ({backlogTasks.length})</option>
               <option value="none">Sans projet assigné</option>
@@ -286,7 +284,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
                 setSearchQuery('');
                 setSelectedProjectFilter('all');
               }}
-              className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-600 font-medium self-start sm:self-center"
+              className="inline-flex items-center gap-1 text-xs text-[#737873] hover:text-[#1A1D1A] font-medium self-start sm:self-center transition-colors"
             >
               <RotateCcw className="h-3 w-3" />
               <span>Réinitialiser</span>
@@ -294,7 +292,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
           )}
         </div>
 
-        <div className="text-xs text-slate-500 shrink-0 font-medium">
+        <div className="text-xs text-[#737873] shrink-0 font-medium">
           {filteredBacklogTasks.length} tâche{filteredBacklogTasks.length > 1 ? 's' : ''} affichée{filteredBacklogTasks.length > 1 ? 's' : ''}
         </div>
       </div>
@@ -303,19 +301,19 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
       {filteredBacklogTasks.length === 0 ? (
         <div
           id="backlog-empty-state"
-          className="rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-12 text-center"
+          className="rounded-2xl border border-dashed border-[#F0EFEB] bg-white p-12 text-center"
         >
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-200/60 text-slate-500 mb-3">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F9F8F6] text-[#5B7083] border border-[#F0EFEB] mb-3">
             <Inbox className="h-6 w-6" />
           </div>
-          <h3 className="text-base font-bold text-slate-800">
+          <h3 className="text-sm font-normal text-[#1A1D1A]">
             {backlogTasks.length === 0
               ? 'Aucune tâche dans le Backlog'
               : 'Aucune tâche correspondant aux filtres'}
           </h3>
-          <p className="mt-1 text-xs text-slate-500 max-w-md mx-auto">
+          <p className="mt-1 text-xs text-[#737873] max-w-md mx-auto font-light">
             {backlogTasks.length === 0
-              ? 'Toutes vos tâches actuelles sont dans le flux de production. Utilisez le champ ci-dessus pour stocker des idées ou tâches futures sans polluer votre tableau principal.'
+              ? 'Toutes vos tâches actuelles sont dans le flux de production. Utilisez le champ ci-dessus pour stocker des idées futures.'
               : 'Modifiez votre recherche ou réinitialisez les filtres pour afficher l’ensemble des tâches du Backlog.'}
           </p>
           {backlogTasks.length === 0 && (
@@ -325,7 +323,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
                 const input = document.getElementById('backlog-quick-title-input');
                 if (input) input.focus();
               }}
-              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-xs"
+              className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#6B8E78] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#5d7c68] transition-colors"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Ajouter une première idée</span>

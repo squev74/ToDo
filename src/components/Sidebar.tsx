@@ -60,28 +60,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <aside
       id="app-sidebar-nav"
       aria-label="Navigation latérale"
-      className="hidden md:flex flex-col w-64 shrink-0 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs space-y-5"
+      className="hidden md:flex flex-col w-64 shrink-0 rounded-2xl border border-[#F0EFEB] bg-white p-4 shadow-[0_2px_10px_rgba(0,0,0,0.02)] space-y-5"
     >
       {/* Espace actif info */}
-      <div className="rounded-xl bg-slate-50 p-3 border border-slate-200/60">
+      <div className="rounded-xl bg-[#F9F8F6] p-3 border border-[#F0EFEB]">
         <div className="flex items-center gap-2 mb-1">
           <div
             className="h-3 w-3 rounded-full shrink-0"
-            style={{ backgroundColor: activeSpace?.couleur || '#6366f1' }}
+            style={{ backgroundColor: activeSpace?.couleur || '#6B8E78' }}
           />
-          <span className="text-xs font-bold text-slate-800 truncate">
+          <span className="text-xs font-medium text-[#1A1D1A] truncate">
             {activeSpace?.nom || 'Espace de travail'}
           </span>
         </div>
-        <p className="text-[11px] text-slate-500">
+        <p className="text-[11px] text-[#737873]">
           {activeTasksCount} active{activeTasksCount > 1 ? 's' : ''} • {backlogTasksCount} backlog
         </p>
       </div>
 
       {/* Navigation principale */}
       <div className="space-y-1">
-        <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-          Vues de l'espace
+        <p className="px-2 text-[10px] font-medium text-[#737873]">
+          Vues de l&apos;espace
         </p>
 
         {/* 1. Tableau des tâches actives */}
@@ -89,10 +89,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id="sidebar-link-tasks"
           type="button"
           onClick={() => onViewChange('tasks')}
-          className={`w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${
+          className={`w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium transition-all ${
             currentView === 'tasks'
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              ? 'bg-[#6B8E78] text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)]'
+              : 'text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A]'
           }`}
         >
           <div className="flex items-center gap-2.5">
@@ -100,25 +100,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Tâches actives</span>
           </div>
           <span
-            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
               currentView === 'tasks'
-                ? 'bg-indigo-700/80 text-white'
-                : 'bg-slate-100 text-slate-600'
+                ? 'bg-white/20 text-white'
+                : 'bg-[#F0EFEB] text-[#737873]'
             }`}
           >
             {activeTasksCount}
           </span>
         </button>
 
-        {/* 2. Nouveau : Vue dédiée Backlog */}
+        {/* 2. Vue dédiée Backlog */}
         <button
           id="sidebar-link-backlog"
           type="button"
           onClick={() => onViewChange('backlog')}
-          className={`w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${
+          className={`w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium transition-all ${
             currentView === 'backlog'
-              ? 'bg-slate-900 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              ? 'bg-[#5B7083] text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)]'
+              : 'text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A]'
           }`}
         >
           <div className="flex items-center gap-2.5">
@@ -126,10 +126,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Backlog</span>
           </div>
           <span
-            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
               currentView === 'backlog'
-                ? 'bg-slate-800 text-slate-200'
-                : 'bg-slate-100 text-slate-600'
+                ? 'bg-white/20 text-white'
+                : 'bg-[#F0EFEB] text-[#737873]'
             }`}
           >
             {backlogTasksCount}
@@ -141,10 +141,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           id="sidebar-link-report"
           type="button"
           onClick={() => onViewChange('report')}
-          className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${
+          className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium transition-all ${
             currentView === 'report'
-              ? 'bg-indigo-600 text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              ? 'bg-[#6B8E78] text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)]'
+              : 'text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A]'
           }`}
         >
           <CalendarCheck className="h-4 w-4" />
@@ -157,27 +157,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
             id="sidebar-link-admin"
             type="button"
             onClick={() => onViewChange('admin')}
-            className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold transition-colors ${
+            className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium transition-all ${
               currentView === 'admin'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-200/50'
+                ? 'bg-[#1A1D1A] text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)]'
+                : 'text-[#737873] bg-[#F0EFEB]/60 hover:bg-[#F0EFEB] border border-[#F0EFEB]'
             }`}
           >
-            <Shield className="h-4 w-4" />
+            <Shield className="h-4 w-4 text-[#5B7083]" />
             <span>Administration</span>
           </button>
         )}
       </div>
 
       {/* Raccourcis rapides */}
-      <div className="pt-2 border-t border-slate-100 space-y-2">
-        <p className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      <div className="pt-2 border-t border-[#F0EFEB] space-y-2">
+        <p className="px-2 text-[10px] font-medium text-[#737873]">
           Actions rapides
         </p>
         <button
           type="button"
           onClick={onOpenTaskModal}
-          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-3 py-2 text-xs font-semibold hover:bg-indigo-100 transition-colors"
+          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-[#6B8E78]/10 text-[#6B8E78] border border-[#6B8E78]/20 px-3 py-2 text-xs font-medium hover:bg-[#6B8E78]/20 active:scale-[0.99] transition-all"
         >
           <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
           <span>Nouvelle tâche</span>
@@ -185,9 +185,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <button
           type="button"
           onClick={onOpenProjectModal}
-          className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 px-3 py-2 text-xs font-semibold hover:bg-slate-50 transition-colors"
+          className="w-full flex items-center justify-center gap-1.5 rounded-xl border border-[#F0EFEB] bg-white text-[#737873] px-3 py-2 text-xs font-medium hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
         >
-          <FolderPlus className="h-3.5 w-3.5 text-indigo-600" />
+          <FolderPlus className="h-3.5 w-3.5 text-[#5B7083]" />
           <span>Projets ({currentSpaceProjectsCount})</span>
         </button>
       </div>

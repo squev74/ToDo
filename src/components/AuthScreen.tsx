@@ -143,25 +143,25 @@ export const AuthScreen: React.FC = () => {
   return (
     <div
       id="auth-screen-container"
-      className="min-h-screen bg-slate-50 flex flex-col justify-center py-10 sm:px-6 lg:px-8"
+      className="min-h-screen bg-[#F9F8F6] flex flex-col justify-center py-10 sm:px-6 lg:px-8"
     >
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         {/* Logo & Titre */}
         <div className="flex justify-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-lg shadow-indigo-200">
-            <CheckSquare className="h-8 w-8" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#6B8E78] text-white shadow-[0_4px_20px_rgba(107,142,120,0.2)]">
+            <CheckSquare className="h-7 w-7" />
           </div>
         </div>
-        <h1 className="mt-4 text-center text-2xl font-black tracking-tight text-slate-900">
+        <h1 className="mt-4 text-center text-2xl font-light tracking-wide text-[#1A1D1A]">
           Gestionnaire de Tâches
         </h1>
-        <p className="mt-2 text-center text-xs text-slate-600 px-4">
-          Synchronisation cloud temps réel et accès sécurisé multi-appareils (Firebase Firestore).
+        <p className="mt-2 text-center text-xs text-[#737873] font-light px-4">
+          Un espace épuré pour organiser votre quotidien avec sérénité
         </p>
       </div>
 
       <div className="mt-7 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
-        <div className="rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+        <div className="rounded-2xl border border-[#F0EFEB] bg-white p-7 shadow-[0_4px_30px_rgba(0,0,0,0.04)]">
           {/* Boutons d'accès direct et Google */}
           <div className="space-y-2.5 mb-6">
             <button
@@ -169,14 +169,14 @@ export const AuthScreen: React.FC = () => {
               type="button"
               onClick={handleGuestSignIn}
               disabled={isGuestSubmitting}
-              className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-4 text-xs font-bold shadow-xs transition-colors"
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#1A1D1A] hover:bg-[#2D312D] text-white py-2.5 px-4 text-xs font-medium shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-colors"
             >
               {isGuestSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Zap className="h-4 w-4 text-amber-400" />
+                <Zap className="h-4 w-4 text-[#C89B7B]" />
               )}
-              <span>Accès immédiat (Mode Démo / Sans configuration)</span>
+              <span>Accès immédiat (Mode Démo)</span>
             </button>
 
             <button
@@ -184,7 +184,7 @@ export const AuthScreen: React.FC = () => {
               type="button"
               onClick={handleGoogleSignIn}
               disabled={isGoogleSubmitting}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 py-2.5 px-4 text-xs font-semibold shadow-2xs transition-colors"
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-[#F0EFEB] bg-white hover:bg-[#F9F8F6] text-[#1A1D1A] py-2.5 px-4 text-xs font-medium shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-colors"
             >
               {isGoogleSubmitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -213,14 +213,14 @@ export const AuthScreen: React.FC = () => {
           </div>
 
           <div className="relative flex items-center justify-center mb-6">
-            <div className="w-full border-t border-slate-200" />
-            <span className="bg-white px-3 text-[11px] font-medium text-slate-400 uppercase tracking-wider absolute">
+            <div className="w-full border-t border-[#F0EFEB]" />
+            <span className="bg-white px-3 text-[11px] font-medium text-[#737873] uppercase tracking-wider absolute">
               ou avec e-mail
             </span>
           </div>
 
           {/* Onglets Connexion / Inscription */}
-          <div className="flex rounded-xl bg-slate-100 p-1 mb-5">
+          <div className="flex rounded-xl bg-[#F9F8F6] p-1 mb-5 border border-[#F0EFEB]">
             <button
               id="tab-login-btn"
               type="button"
@@ -230,10 +230,10 @@ export const AuthScreen: React.FC = () => {
                 setIsOperationNotAllowed(false);
                 setIsUnauthorizedDomain(false);
               }}
-              className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
+              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                 !isSignUp
-                  ? 'bg-white text-indigo-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-[#1A1D1A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-[#F0EFEB]'
+                  : 'text-[#737873] hover:text-[#1A1D1A]'
               }`}
             >
               Se connecter
@@ -247,10 +247,10 @@ export const AuthScreen: React.FC = () => {
                 setIsOperationNotAllowed(false);
                 setIsUnauthorizedDomain(false);
               }}
-              className={`flex-1 rounded-lg py-2 text-xs font-bold transition-all ${
+              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all ${
                 isSignUp
-                  ? 'bg-white text-indigo-700 shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-[#1A1D1A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-[#F0EFEB]'
+                  : 'text-[#737873] hover:text-[#1A1D1A]'
               }`}
             >
               Créer un compte
@@ -261,52 +261,52 @@ export const AuthScreen: React.FC = () => {
           {errorMsg && (
             <div
               id="auth-error-banner"
-              className="mb-5 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-800"
+              className="mb-5 rounded-xl border border-[#C89B7B]/30 bg-[#C89B7B]/10 p-3.5 text-xs text-[#966847]"
             >
               <div className="flex items-start gap-2.5">
-                <AlertCircle className="h-4 w-4 shrink-0 text-rose-600 mt-0.5" />
+                <AlertCircle className="h-4 w-4 shrink-0 text-[#C89B7B] mt-0.5" />
                 <div className="flex-1 space-y-2">
                   <span className="font-medium leading-relaxed block">{errorMsg}</span>
 
                   {/* Guide spécifique pour auth/unauthorized-domain */}
                   {isUnauthorizedDomain && (
-                    <div className="mt-2.5 pt-2.5 border-t border-rose-200/80 space-y-3">
-                      <div className="rounded-lg bg-white/90 p-2.5 border border-rose-100 text-slate-700 space-y-1.5">
-                        <div className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
-                          <Globe className="h-3.5 w-3.5 text-indigo-600" />
+                    <div className="mt-2.5 pt-2.5 border-t border-[#C89B7B]/20 space-y-3">
+                      <div className="rounded-xl bg-white p-2.5 border border-[#F0EFEB] text-[#1A1D1A] space-y-1.5">
+                        <div className="text-[11px] font-medium text-[#1A1D1A] flex items-center gap-1.5">
+                          <Globe className="h-3.5 w-3.5 text-[#6B8E78]" />
                           <span>Domaine à autoriser dans Firebase :</span>
                         </div>
-                        <div className="flex items-center gap-2 bg-slate-50 rounded-md p-1.5 border border-slate-200">
-                          <code className="text-[11px] font-mono font-bold text-indigo-700 flex-1 truncate select-all">
+                        <div className="flex items-center gap-2 bg-[#F9F8F6] rounded-lg p-1.5 border border-[#F0EFEB]">
+                          <code className="text-[11px] font-mono font-medium text-[#6B8E78] flex-1 truncate select-all">
                             {currentHostname || 'votre-domaine.github.io'}
                           </code>
                           <button
                             type="button"
                             onClick={handleCopyHostname}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-700 shadow-2xs transition-colors shrink-0"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white hover:bg-[#F0EFEB] border border-[#F0EFEB] text-[10px] font-medium text-[#1A1D1A] transition-colors shrink-0"
                             title="Copier le domaine"
                           >
                             {domainCopied ? (
                               <>
-                                <Check className="h-3 w-3 text-emerald-600" />
-                                <span className="text-emerald-700">Copié !</span>
+                                <Check className="h-3 w-3 text-[#6B8E78]" />
+                                <span className="text-[#6B8E78]">Copié !</span>
                               </>
                             ) : (
                               <>
-                                <Copy className="h-3 w-3 text-slate-500" />
+                                <Copy className="h-3 w-3 text-[#737873]" />
                                 <span>Copier</span>
                               </>
                             )}
                           </button>
                         </div>
-                        <ol className="list-decimal list-inside text-[11px] text-slate-600 space-y-1 pt-1">
+                        <ol className="list-decimal list-inside text-[11px] text-[#737873] space-y-1 pt-1 font-light">
                           <li>
                             Ouvrez la{' '}
                             <a
                               href={`https://console.firebase.google.com/project/${firebaseConfig.projectId || 'mongestionnairetaches-379fb'}/authentication/settings`}
                               target="_blank"
                               rel="noreferrer"
-                              className="font-bold text-indigo-600 hover:underline inline-flex items-center gap-0.5"
+                              className="font-medium text-[#6B8E78] hover:underline inline-flex items-center gap-0.5"
                             >
                               Console Firebase (Paramètres Auth)
                               <ExternalLink className="h-2.5 w-2.5" />
@@ -322,9 +322,9 @@ export const AuthScreen: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => loginWithLocalSession('invite@demo.fr')}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white px-3 py-1.5 font-bold text-[11px] shadow-xs transition-colors"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#1A1D1A] hover:bg-[#2D312D] text-white px-3 py-1.5 font-medium text-[11px] transition-colors"
                         >
-                          <Zap className="h-3.5 w-3.5 text-amber-400" />
+                          <Zap className="h-3.5 w-3.5 text-[#C89B7B]" />
                           <span>Accéder immédiatement (Mode Démo)</span>
                         </button>
                       </div>
@@ -336,7 +336,7 @@ export const AuthScreen: React.FC = () => {
                       <button
                         type="button"
                         onClick={handleDirectAccessWithCurrentEmail}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 font-bold text-[11px] shadow-xs transition-colors"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-[#6B8E78] hover:bg-[#5d7c68] text-white px-3 py-1.5 font-medium text-[11px] transition-colors"
                       >
                         <span>Entrer immédiatement avec cet e-mail</span>
                         <ArrowRight className="h-3.5 w-3.5" />
@@ -353,12 +353,12 @@ export const AuthScreen: React.FC = () => {
             <div>
               <label
                 htmlFor="auth-email-input"
-                className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-medium text-[#737873] uppercase tracking-wider mb-1.5"
               >
                 Adresse e-mail
               </label>
               <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[#737873]">
                   <Mail className="h-4 w-4" />
                 </div>
                 <input
@@ -369,7 +369,7 @@ export const AuthScreen: React.FC = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="nom@domaine.com"
-                  className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+                  className="w-full rounded-xl border border-[#F0EFEB] bg-white py-2.5 pl-9 pr-3 text-xs text-[#1A1D1A] placeholder:text-[#737873]/50 focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
                 />
               </div>
             </div>
@@ -377,12 +377,12 @@ export const AuthScreen: React.FC = () => {
             <div>
               <label
                 htmlFor="auth-password-input"
-                className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+                className="block text-xs font-medium text-[#737873] uppercase tracking-wider mb-1.5"
               >
                 Mot de passe
               </label>
               <div className="relative">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[#737873]">
                   <Lock className="h-4 w-4" />
                 </div>
                 <input
@@ -393,12 +393,12 @@ export const AuthScreen: React.FC = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Au moins 6 caractères"
-                  className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-10 text-xs text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+                  className="w-full rounded-xl border border-[#F0EFEB] bg-white py-2.5 pl-9 pr-10 text-xs text-[#1A1D1A] placeholder:text-[#737873]/50 focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 transition-colors"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-[#737873] hover:text-[#1A1D1A] transition-colors"
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -413,7 +413,7 @@ export const AuthScreen: React.FC = () => {
               id="auth-submit-btn"
               type="submit"
               disabled={isSubmitting}
-              className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-xs font-bold text-white shadow-sm hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-60 transition-colors"
+              className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl bg-[#6B8E78] py-3 text-xs font-medium text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:bg-[#5d7c68] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/20 disabled:opacity-60 transition-colors"
             >
               {isSubmitting ? (
                 <>
@@ -435,9 +435,9 @@ export const AuthScreen: React.FC = () => {
           </form>
 
           {/* Avantages Cloud */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <div className="flex items-center gap-2 text-[11px] text-slate-500">
-              <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+          <div className="mt-6 pt-5 border-t border-[#F0EFEB]">
+            <div className="flex items-center gap-2 text-[11px] text-[#737873] font-light">
+              <ShieldCheck className="h-4 w-4 text-[#6B8E78] shrink-0" />
               <span>Base Firestore sécurisée par utilisateur • Sauvegarde instantanée</span>
             </div>
           </div>

@@ -1,0 +1,65 @@
+/**
+ * PALETTE ET VARIABLES ZEN JAPANDI
+ * 
+ * - Background global : #F9F8F6 (Warm Canvas)
+ * - Carte / Surface : #FFFFFF (Pure White)
+ * - Texte principal : #1A1D1A (Deep Charcoal - pas de noir pur)
+ * - Texte secondaire : #737873 (Soft Slate)
+ * - Accent principal : #6B8E78 (Sage Mist / Vert Sauge)
+ * - Accent secondaire : #5B7083 (Slate Blue / Bleu Ardoise)
+ * - Survol / Subtile : #F0EFEB (Washed Linen)
+ * - Tâche terminée : #A3B19B (Faded Olive)
+ */
+
+:root {
+  --zen-canvas: #F9F8F6;
+  --zen-surface: #FFFFFF;
+  --zen-primary: #1A1D1A;
+  --zen-secondary: #737873;
+  --zen-sage: #6B8E78;
+  --zen-sage-hover: #5d7c68;
+  --zen-slate: #5B7083;
+  --zen-linen: #F0EFEB;
+  --zen-olive: #A3B19B;
+  --zen-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+}
+
+/* Animations Zen douces et naturelles */
+@keyframes zenFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes zenFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.zen-fade-in {
+  animation: zenFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.zen-fade-out {
+  animation: zenFadeOut 0.3s ease-out forwards;
+}
+
+/* Utilitaires pour transitions et ombres sans heurts */
+.zen-card-shadow {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+}
+
+.zen-transition {
+  transition: all 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}

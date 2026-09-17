@@ -17,9 +17,15 @@ export interface Tache {
   dateEcheance?: string | null; // Format YYYY-MM-DD
   dateRealisation: string | null; // Horodatage ISO automatique quand statut passe à 'Done'
   dateModification?: string; // Horodatage ISO quand la tâche ou son statut est modifié
+  createdAt?: string; // Horodatage ISO de création
+  updatedAt?: string; // Horodatage ISO de dernière mise à jour
+  lastActivityAt?: string; // Horodatage ISO de dernière activité (édition, statut, commentaire)
   ordre: number; // Nombre entier pour le tri
   commentaires: Commentaire[];
 }
+
+// Alias Task conforme aux conventions TypeScript
+export type Task = Tache;
 
 export interface Projet {
   id: string;

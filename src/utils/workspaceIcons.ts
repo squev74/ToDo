@@ -41,16 +41,16 @@ export const WORKSPACE_ICONS: WorkspaceIconOption[] = [
 ];
 
 export const WORKSPACE_PRESET_COLORS = [
-  '#6366f1', // indigo
-  '#3b82f6', // blue
-  '#06b6d4', // cyan
-  '#10b981', // emerald
-  '#84cc16', // lime
-  '#f59e0b', // amber
-  '#f97316', // orange
-  '#ec4899', // pink
-  '#8b5cf6', // purple
-  '#64748b', // slate
+  '#6B8E78', // Vert Sauge (Sage Mist)
+  '#5B7083', // Bleu Ardoise (Slate Blue)
+  '#C89B7B', // Terracotta doux (Warm Ochre)
+  '#A3B19B', // Olive douce (Faded Olive)
+  '#B86B53', // Terracotta / Brique douce
+  '#7E6B8E', // Prune feutrée
+  '#52796F', // Mousse profonde
+  '#4A5568', // Anthracite doux
+  '#9C6644', // Argile chaude
+  '#486581', // Indigo délavé
 ];
 
 export function getWorkspaceIconComponent(iconName?: string): LucideIcon {

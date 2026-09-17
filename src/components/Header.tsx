@@ -12,6 +12,7 @@ import {
   LogOut,
   Zap,
   Cloud,
+  Sparkles,
 } from 'lucide-react';
 import { Espace, Tache, Projet, ADMIN_EMAIL, ADMIN_UID } from '../types';
 import { WorkspaceSelector } from './WorkspaceSelector';
@@ -29,6 +30,7 @@ export interface HeaderProps {
   onOpenWorkspaceModal: (mode: 'list' | 'create') => void;
   onOpenProjectModal: () => void;
   onOpenRecurringModal?: () => void;
+  onOpenActivityReportModal?: () => void;
   onOpenTaskModal: () => void;
   onExportJson: () => void;
   onImportJson: () => void;
@@ -47,6 +49,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenWorkspaceModal,
   onOpenProjectModal,
   onOpenRecurringModal,
+  onOpenActivityReportModal,
   onOpenTaskModal,
   onExportJson,
   onImportJson,
@@ -77,47 +80,47 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header
       id="main-header"
-      className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur-md shadow-2xs"
+      className="sticky top-0 z-30 border-b border-[#F0EFEB] bg-white/95 backdrop-blur-md shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-all duration-300"
     >
-      <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6">
+      <div className="mx-auto max-w-4xl px-4 py-3 sm:px-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           {/* Titre, Logo & Sélecteur d'Espace de travail */}
           <div className="flex flex-wrap items-center gap-3">
             <div
               id="header-logo"
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs shrink-0 cursor-pointer"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#6B8E78] text-white shadow-none shrink-0 cursor-pointer hover:bg-[#5d7c68] transition-colors duration-300"
               onClick={() => onViewChange('tasks')}
               title="Aller aux tâches"
             >
-              <ListTodo className="h-5 w-5" />
+              <ListTodo className="h-4 w-4" />
             </div>
 
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold tracking-tight text-slate-900">
+                <h1 className="text-base sm:text-lg font-medium tracking-tight text-[#1A1D1A]">
                   Gestionnaire de Tâches
                 </h1>
                 {isSuperAdmin && (
-                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#6B8E78]/10 text-[#6B8E78] border border-[#6B8E78]/20">
                     <Shield className="w-3 h-3" />
                     <span>Admin</span>
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+              <div className="flex items-center gap-2 text-xs text-[#737873] mt-0.5 font-light">
                 <span>
                   {currentSpaceTasks.length} tâche{currentSpaceTasks.length > 1 ? 's' : ''} •{' '}
                   {currentSpaceProjects.length} projet{currentSpaceProjects.length > 1 ? 's' : ''}
                 </span>
-                <span className="text-slate-300">•</span>
+                <span className="text-[#D3CFC8]">•</span>
                 {user?.isLocalFallback ? (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200">
-                    <Zap className="h-3 w-3 text-amber-500" />
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#966847] bg-[#C89B7B]/15 px-1.5 py-0.5 rounded-md border border-[#C89B7B]/30">
+                    <Zap className="h-3 w-3 text-[#966847]" />
                     <span>Local</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6B8E78]">
                     <Cloud className="h-3 w-3" />
                     <span>Cloud</span>
                   </span>
@@ -126,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Sélecteur d'espace de travail */}
-            <div className="ml-0 sm:ml-2 pl-0 sm:pl-3 sm:border-l sm:border-slate-200 flex items-center gap-1.5">
+            <div className="ml-0 sm:ml-2 pl-0 sm:pl-3 sm:border-l sm:border-[#F0EFEB] flex items-center gap-1.5">
               <WorkspaceSelector
                 spaces={spaces}
                 activeSpaceId={activeSpaceId}
@@ -145,53 +148,67 @@ export const Header: React.FC<HeaderProps> = ({
               id="open-projects-manager-btn"
               type="button"
               onClick={onOpenProjectModal}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#F0EFEB] bg-white px-2.5 py-1.5 text-xs font-medium text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-all duration-300"
               title="Gérer les projets de l'espace"
             >
-              <FolderPlus className="h-4 w-4 text-indigo-600" />
+              <FolderPlus className="h-3.5 w-3.5 text-[#6B8E78]" />
               <span className="hidden sm:inline">Projets</span>
-              <span className="rounded-full bg-slate-100 px-1.5 py-0.2 text-[11px] font-bold text-slate-600">
+              <span className="rounded-full bg-[#F0EFEB] px-1.5 py-0.2 text-[10px] font-medium text-[#737873]">
                 {currentSpaceProjects.length}
               </span>
             </button>
 
-            {/* Bouton Tâches planifiées et récurrentes (inspiration Outlook) */}
+            {/* Bouton Tâches planifiées et récurrentes */}
             {onOpenRecurringModal && (
               <button
                 id="open-recurring-modal-btn"
                 type="button"
                 onClick={onOpenRecurringModal}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-indigo-50/70 hover:text-indigo-900 hover:border-indigo-200 transition-colors shadow-2xs"
-                title="Gérer les tâches récurrentes planifiées (inspiration Outlook)"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#F0EFEB] bg-white px-2.5 py-1.5 text-xs font-medium text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-all duration-300"
+                title="Gérer les tâches récurrentes planifiées"
               >
-                <CalendarClock className="h-4 w-4 text-indigo-600" />
-                <span className="hidden sm:inline">Récurrences</span>
+                <CalendarClock className="h-3.5 w-3.5 text-[#5B7083]" />
+                <span className="hidden sm:inline">Récurrentes</span>
                 {recurringCount !== undefined && recurringCount > 0 && (
-                  <span className="rounded-full bg-indigo-50 px-1.5 py-0.2 text-[11px] font-bold text-indigo-700 border border-indigo-200">
+                  <span className="rounded-full bg-[#5B7083]/15 px-1.5 py-0.2 text-[10px] font-medium text-[#5B7083]">
                     {recurringCount}
                   </span>
                 )}
               </button>
             )}
 
+            {/* Bouton Rapport IA Gemini */}
+            {onOpenActivityReportModal && (
+              <button
+                id="open-ai-report-modal-btn"
+                type="button"
+                onClick={onOpenActivityReportModal}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-[#6B8E78]/30 bg-[#6B8E78]/10 px-2.5 py-1.5 text-xs font-medium text-[#6B8E78] hover:bg-[#6B8E78] hover:text-white transition-all duration-300"
+                title="Générer un compte-rendu d'activité avec Gemini"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Rapport IA</span>
+              </button>
+            )}
+
             {/* Boutons Exporter / Importer JSON */}
-            <div className="flex items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-2xs">
+            <div className="flex items-center rounded-xl border border-[#F0EFEB] bg-white p-0.5">
               <button
                 id="export-json-button"
                 type="button"
                 onClick={onExportJson}
-                className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors duration-300"
                 title="Exporter toutes les données (espaces, projets, tâches) au format JSON"
               >
                 <Download className="h-3.5 w-3.5" />
                 <span className="hidden md:inline">Exporter</span>
               </button>
-              <div className="h-4 w-px bg-slate-200" />
+              <div className="h-3 w-px bg-[#F0EFEB]" />
               <button
                 id="import-json-button"
                 type="button"
                 onClick={onImportJson}
-                className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors duration-300"
                 title="Importer un fichier JSON"
               >
                 <Upload className="h-3.5 w-3.5" />
@@ -199,28 +216,28 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             </div>
 
-            {/* Bouton Nouvelle Tâche */}
+            {/* Bouton Nouvelle Tâche Sauge */}
             <button
               id="create-task-primary-btn"
               type="button"
               onClick={onOpenTaskModal}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-xs"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#6B8E78] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#5d7c68] active:scale-[0.99] transition-all duration-300 ease-out shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
             >
-              <Plus className="h-4 w-4 stroke-[2.5]" />
+              <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
               <span>Nouvelle tâche</span>
             </button>
 
             {/* Compte Utilisateur & Déconnexion */}
-            <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-slate-200">
+            <div className="flex items-center gap-2 pl-1 sm:pl-2 border-l border-[#F0EFEB]">
               <div className="hidden lg:flex flex-col text-right">
                 <span
-                  className="text-[11px] font-semibold text-slate-700 truncate max-w-[140px]"
+                  className="text-[11px] font-medium text-[#1A1D1A] truncate max-w-[130px]"
                   title={user?.email || ''}
                 >
                   {user?.email}
                 </span>
-                <span className="text-[10px] text-slate-400">
-                  {user?.isLocalFallback ? 'Session Démo' : isSuperAdmin ? 'Administrateur' : 'Utilisateur'}
+                <span className="text-[10px] text-[#737873]">
+                  {user?.isLocalFallback ? 'Session Démo' : isSuperAdmin ? 'Admin' : 'Membre'}
                 </span>
               </div>
 
@@ -228,37 +245,36 @@ export const Header: React.FC<HeaderProps> = ({
                 id="logout-btn"
                 type="button"
                 onClick={onLogout}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1 rounded-xl border border-[#F0EFEB] bg-white px-2 py-1.5 text-xs font-medium text-[#737873] hover:bg-rose-50/80 hover:text-rose-600 hover:border-rose-100 transition-colors duration-300"
                 title="Se déconnecter"
               >
                 <LogOut className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Déconnexion</span>
               </button>
             </div>
           </div>
         </div>
 
         {/* Menu de navigation principal par Onglets */}
-        <div id="main-navigation-tabs" className="mt-3 flex items-center border-t border-slate-100 pt-2.5">
-          <nav className="flex items-center gap-2">
+        <div id="main-navigation-tabs" className="mt-3 flex items-center border-t border-[#F0EFEB] pt-2.5">
+          <nav className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
             {/* Onglet : Liste des tâches actives */}
             <button
               id="tab-view-tasks"
               type="button"
               onClick={() => onViewChange('tasks')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
                 currentView === 'tasks'
-                  ? 'bg-indigo-50 text-indigo-700 font-bold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  ? 'bg-[#6B8E78] text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)]'
+                  : 'text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A]'
               }`}
             >
               <ListTodo className="h-3.5 w-3.5" />
               <span>Tâches actives</span>
               <span
-                className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                className={`rounded-full px-1.5 py-0.2 text-[10px] font-medium ${
                   currentView === 'tasks'
-                    ? 'bg-indigo-200/80 text-indigo-900'
-                    : 'bg-slate-100 text-slate-500'
+                    ? 'bg-white/20 text-white'
+                    : 'bg-[#F0EFEB] text-[#737873]'
                 }`}
               >
                 {activeTasksCount}
@@ -270,20 +286,20 @@ export const Header: React.FC<HeaderProps> = ({
               id="tab-view-backlog"
               type="button"
               onClick={() => onViewChange('backlog')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
                 currentView === 'backlog'
-                  ? 'bg-slate-900 text-white font-bold shadow-xs'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  ? 'bg-[#5B7083] text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)]'
+                  : 'text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A]'
               }`}
             >
               <Inbox className="h-3.5 w-3.5" />
               <span>Backlog</span>
               {backlogTasksCount > 0 && (
                 <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-medium ${
                     currentView === 'backlog'
-                      ? 'bg-slate-700 text-slate-200'
-                      : 'bg-slate-200 text-slate-700'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-[#F0EFEB] text-[#737873]'
                   }`}
                 >
                   {backlogTasksCount}
@@ -296,10 +312,10 @@ export const Header: React.FC<HeaderProps> = ({
               id="tab-view-report"
               type="button"
               onClick={() => onViewChange('report')}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
                 currentView === 'report'
-                  ? 'bg-indigo-50 text-indigo-700 font-bold'
-                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  ? 'bg-[#6B8E78] text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)]'
+                  : 'text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A]'
               }`}
             >
               <CalendarCheck className="h-3.5 w-3.5" />
@@ -312,10 +328,10 @@ export const Header: React.FC<HeaderProps> = ({
                 id="tab-view-admin"
                 type="button"
                 onClick={() => onViewChange('admin')}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
                   currentView === 'admin'
-                    ? 'bg-indigo-600 text-white font-bold shadow-xs'
-                    : 'text-indigo-700 bg-indigo-50/70 hover:bg-indigo-100 border border-indigo-200/60'
+                    ? 'bg-[#1A1D1A] text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)]'
+                    : 'text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A]'
                 }`}
                 title="Panneau d'administration des utilisateurs"
               >

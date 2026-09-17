@@ -27,38 +27,38 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   return (
     <div
       id="confirmation-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1D1A]/30 p-4 backdrop-blur-xs transition-opacity duration-300"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
       <div
         id="confirmation-modal-container"
-        className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl border border-slate-200"
+        className="w-full max-w-md rounded-2xl bg-white p-6 sm:p-7 shadow-[0_4px_30px_rgba(0,0,0,0.04)] border border-[#F0EFEB] transition-all duration-300 animate-in fade-in zoom-in-95"
       >
         <div className="flex items-start gap-4">
           <div
             id="confirmation-modal-icon-badge"
-            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
-              isDanger ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600'
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+              isDanger ? 'bg-rose-50 text-rose-600 border border-rose-100' : 'bg-[#C89B7B]/15 text-[#966847] border border-[#C89B7B]/30'
             }`}
           >
-            <AlertTriangle className="h-6 w-6" aria-hidden="true" />
+            <AlertTriangle className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className="flex-1">
-            <h3 id="modal-title" className="text-lg font-semibold text-slate-900">
+            <h3 id="modal-title" className="text-base font-normal tracking-wide text-[#1A1D1A]">
               {title}
             </h3>
-            <p className="mt-2 text-sm text-slate-600 leading-relaxed">{message}</p>
+            <p className="mt-2 text-xs text-[#737873] leading-relaxed">{message}</p>
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-end gap-3">
+        <div className="mt-6 flex items-center justify-end gap-2.5">
           <button
             id="confirmation-modal-cancel-button"
             type="button"
             onClick={onCancel}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors focus:outline-hidden focus:ring-2 focus:ring-slate-400"
+            className="rounded-xl border border-[#F0EFEB] bg-white px-4 py-2 text-xs font-medium text-[#737873] hover:text-[#1A1D1A] hover:bg-[#F0EFEB] transition-colors"
           >
             {cancelLabel}
           </button>
@@ -66,10 +66,10 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             id="confirmation-modal-confirm-button"
             type="button"
             onClick={onConfirm}
-            className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors focus:outline-hidden focus:ring-2 ${
+            className={`rounded-xl px-4.5 py-2 text-xs font-medium text-white transition-all duration-300 shadow-[0_2px_10px_rgba(0,0,0,0.02)] ${
               isDanger
-                ? 'bg-rose-600 hover:bg-rose-700 focus:ring-rose-500'
-                : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500'
+                ? 'bg-rose-600 hover:bg-rose-700'
+                : 'bg-[#6B8E78] hover:bg-[#5d7c68]'
             }`}
           >
             {confirmLabel}

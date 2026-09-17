@@ -167,26 +167,26 @@ service cloud.firestore {
   return (
     <div
       id="workspace-manager-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1D1A]/30 p-4 backdrop-blur-xs transition-opacity duration-300"
       role="dialog"
       aria-modal="true"
       aria-labelledby="workspace-manager-title"
     >
       <div
         id="workspace-manager-container"
-        className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-xl rounded-2xl bg-white p-6 sm:p-7 shadow-[0_4px_30px_rgba(0,0,0,0.04)] border border-[#F0EFEB] animate-in fade-in zoom-in-95 duration-200"
       >
         {/* Entête */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+        <div className="flex items-center justify-between pb-4 border-b border-[#F0EFEB]">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 shadow-2xs">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6B8E78]/10 text-[#6B8E78]">
               <FolderKanban className="h-5 w-5" />
             </div>
             <div>
-              <h3 id="workspace-manager-title" className="text-base font-bold text-slate-900">
-                Espaces de travail (Workspaces)
+              <h3 id="workspace-manager-title" className="text-base font-normal tracking-wide text-[#1A1D1A]">
+                Espaces de travail
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[#737873]">
                 Cloisonnez vos projets, tâches et rapports selon vos contextes de vie
               </p>
             </div>
@@ -195,7 +195,7 @@ service cloud.firestore {
             id="workspace-manager-close-btn"
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            className="rounded-xl p-1.5 text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -206,20 +206,20 @@ service cloud.firestore {
           /* FORMULAIRE DE CRÉATION / ÉDITION */
           <form onSubmit={handleSubmit} className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              <h4 className="text-xs font-medium text-[#737873]">
                 {editingSpaceId ? 'Modifier l’espace' : 'Créer un nouvel espace'}
               </h4>
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="text-xs font-medium text-slate-500 hover:text-slate-800"
+                className="text-xs font-medium text-[#5B7083] hover:text-[#1A1D1A] transition-colors"
               >
                 Retour à la liste
               </button>
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 rounded-lg bg-rose-50 p-2.5 text-xs text-rose-700 border border-rose-200">
+              <div className="flex items-center gap-2 rounded-xl bg-rose-50/70 p-2.5 text-xs text-rose-700 border border-rose-200/60">
                 <AlertTriangle className="h-4 w-4 shrink-0 text-rose-500" />
                 <span>{error}</span>
               </div>
@@ -227,7 +227,7 @@ service cloud.firestore {
 
             {/* Nom de l'espace */}
             <div>
-              <label htmlFor="workspace-name-input" className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="workspace-name-input" className="block text-xs font-medium text-[#737873] mb-1">
                 Nom de l&apos;espace <span className="text-rose-500">*</span>
               </label>
               <input
@@ -239,14 +239,14 @@ service cloud.firestore {
                   if (error) setError('');
                 }}
                 placeholder="Ex: Travail, Maison, Hobbies, Études..."
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+                className="w-full rounded-xl border border-[#F0EFEB] bg-[#F9F8F6] px-3.5 py-2 text-xs text-[#1A1D1A] placeholder:text-[#737873]/60 focus:border-[#6B8E78] focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
                 autoFocus
               />
             </div>
 
             {/* Description facultative */}
             <div>
-              <label htmlFor="workspace-desc-input" className="block text-xs font-semibold text-slate-700 mb-1">
+              <label htmlFor="workspace-desc-input" className="block text-xs font-medium text-[#737873] mb-1">
                 Description (facultative)
               </label>
               <input
@@ -255,14 +255,14 @@ service cloud.firestore {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Ex: Activités professionnelles et missions clients"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:outline-hidden focus:ring-2 focus:ring-indigo-100"
+                className="w-full rounded-xl border border-[#F0EFEB] bg-[#F9F8F6] px-3.5 py-2 text-xs text-[#1A1D1A] placeholder:text-[#737873]/60 focus:border-[#6B8E78] focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
               />
             </div>
 
             {/* Sélecteur de couleur */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-2">
-                Couleur distinctive
+              <label className="block text-xs font-medium text-[#737873] mb-2">
+                Nuance distinctive
               </label>
               <div className="flex flex-wrap items-center gap-2">
                 {WORKSPACE_PRESET_COLORS.map((c) => (
@@ -270,7 +270,7 @@ service cloud.firestore {
                     key={c}
                     type="button"
                     onClick={() => setCouleur(c)}
-                    className="relative flex h-7 w-7 items-center justify-center rounded-lg transition-transform hover:scale-110 shadow-2xs"
+                    className="relative flex h-7 w-7 items-center justify-center rounded-lg transition-transform hover:scale-110 shadow-none"
                     style={{ backgroundColor: c }}
                   >
                     {couleur === c && <Check className="h-4 w-4 text-white stroke-[3]" />}
@@ -281,10 +281,10 @@ service cloud.firestore {
 
             {/* Sélecteur d'icône */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-2">
+              <label className="block text-xs font-medium text-[#737873] mb-2">
                 Icône représentative
               </label>
-              <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 max-h-40 overflow-y-auto p-1 border border-slate-200 rounded-xl bg-slate-50/50">
+              <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 max-h-40 overflow-y-auto p-1.5 border border-[#F0EFEB] rounded-xl bg-[#F9F8F6]">
                 {WORKSPACE_ICONS.map((item) => {
                   const Icon = item.icon;
                   const isSelected = icone === item.id;
@@ -294,10 +294,10 @@ service cloud.firestore {
                       type="button"
                       onClick={() => setIcone(item.id)}
                       title={item.label}
-                      className={`flex flex-col items-center gap-1 p-2 rounded-lg text-center transition-all ${
+                      className={`flex flex-col items-center gap-1 p-2 rounded-xl text-center transition-all ${
                         isSelected
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                          ? 'bg-[#6B8E78] text-white shadow-none'
+                          : 'bg-white text-[#737873] hover:text-[#1A1D1A] hover:bg-[#F0EFEB] border border-[#F0EFEB]'
                       }`}
                     >
                       <Icon className="h-4 w-4" />
@@ -311,18 +311,18 @@ service cloud.firestore {
             </div>
 
             {/* Boutons d'action formulaire */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#F0EFEB]">
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                className="rounded-xl border border-[#F0EFEB] bg-white px-3.5 py-1.5 text-xs font-medium text-[#737873] hover:text-[#1A1D1A] hover:bg-[#F0EFEB] transition-colors"
               >
                 Annuler
               </button>
               <button
                 id="save-workspace-submit-btn"
                 type="submit"
-                className="rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-xs"
+                className="rounded-xl bg-[#6B8E78] px-4 py-1.5 text-xs font-medium text-white hover:bg-[#5d7c68] active:scale-[0.99] transition-all duration-300 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
               >
                 {editingSpaceId ? 'Enregistrer les modifications' : 'Créer l’espace'}
               </button>
@@ -332,21 +332,21 @@ service cloud.firestore {
           /* LISTE DES ESPACES */
           <div className="mt-4 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+              <span className="text-xs font-medium text-[#737873]">
                 Vos espaces configurés ({spaces.length})
               </span>
               <button
                 id="start-create-workspace-btn"
                 type="button"
                 onClick={startCreate}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-2xs"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#6B8E78] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#5d7c68] active:scale-[0.99] transition-all duration-300 shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
               >
                 <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                 <span>Nouvel espace</span>
               </button>
             </div>
 
-            <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+            <div className="max-h-72 overflow-y-auto space-y-1.5 pr-1">
               {spaces.map((space) => {
                 const SpaceIcon = getWorkspaceIconComponent(space.icone);
                 const isSelected = space.id === activeSpaceId;
@@ -360,30 +360,30 @@ service cloud.firestore {
                     id={`workspace-row-${space.id}`}
                     className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
                       isSelected
-                        ? 'border-indigo-300 bg-indigo-50/40 shadow-xs'
-                        : 'border-slate-200 bg-white hover:border-slate-300'
+                        ? 'border-[#6B8E78]/30 bg-[#6B8E78]/5'
+                        : 'border-[#F0EFEB] bg-white hover:border-[#E2DFD8]'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div
-                        className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-2xs shrink-0"
-                        style={{ backgroundColor: space.couleur || '#6366f1' }}
+                        className="flex h-8 w-8 items-center justify-center rounded-xl text-white shrink-0"
+                        style={{ backgroundColor: space.couleur || '#6B8E78' }}
                       >
                         <SpaceIcon className="h-4 w-4 stroke-[2.5]" />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
-                          <h4 className="text-xs font-bold text-slate-900 truncate">
+                          <h4 className="text-xs font-medium text-[#1A1D1A] truncate">
                             {space.nom}
                           </h4>
                           {isSelected && (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-indigo-100/80 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-[#6B8E78]/15 px-1.5 py-0.5 text-[10px] font-medium text-[#6B8E78]">
                               <CheckCircle2 className="h-3 w-3" />
                               Actif
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500">
+                        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-[#737873]">
                           <span>
                             {taskCount} tâche{taskCount > 1 ? 's' : ''}
                           </span>
@@ -394,7 +394,7 @@ service cloud.firestore {
                           {space.description && (
                             <>
                               <span>•</span>
-                              <span className="truncate max-w-[160px] text-slate-400">
+                              <span className="truncate max-w-[160px] text-[#737873]/70">
                                 {space.description}
                               </span>
                             </>
@@ -411,7 +411,7 @@ service cloud.firestore {
                             onSelectSpace(space.id);
                             onClose();
                           }}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+                          className="rounded-lg border border-[#F0EFEB] bg-white px-2.5 py-1 text-[11px] font-medium text-[#737873] hover:text-[#1A1D1A] hover:bg-[#F0EFEB] transition-colors"
                         >
                           Basculer
                         </button>
@@ -420,7 +420,7 @@ service cloud.firestore {
                       <button
                         type="button"
                         onClick={() => startEdit(space)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                        className="rounded-lg p-1.5 text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
                         title="Modifier l'espace"
                       >
                         <Edit2 className="h-3.5 w-3.5" />
@@ -432,8 +432,8 @@ service cloud.firestore {
                         onClick={() => onRequestDeleteSpace(space)}
                         className={`rounded-lg p-1.5 transition-colors ${
                           isOnlySpace
-                            ? 'text-slate-300 cursor-not-allowed'
-                            : 'text-slate-400 hover:bg-rose-50 hover:text-rose-600'
+                            ? 'text-[#737873]/30 cursor-not-allowed'
+                            : 'text-[#737873] hover:bg-rose-50 hover:text-rose-600'
                         }`}
                         title={
                           isOnlySpace
@@ -449,22 +449,22 @@ service cloud.firestore {
               })}
             </div>
 
-            <div className="rounded-xl bg-slate-50 p-3 text-[11px] text-slate-600 border border-slate-200">
-              <p className="font-semibold text-slate-700 mb-0.5">Étanchéité des données :</p>
+            <div className="rounded-xl bg-[#F9F8F6] p-3 text-[11px] text-[#737873] border border-[#F0EFEB]">
+              <p className="font-medium text-[#1A1D1A] mb-0.5">Cloisonnement zen des données :</p>
               <p>
-                Changer d&apos;espace isole strictement vos listes, projets, statuts et rapports journaliers.
-                Vous pouvez créer des espaces pour chaque facette de votre organisation.
+                Changer d&apos;espace isole strictement vos listes, projets, statuts et rapports.
+                Créez un espace dédié pour chaque facette de vos activités.
               </p>
             </div>
 
-            <div className="border-t border-slate-100 pt-2">
+            <div className="border-t border-[#F0EFEB] pt-2">
               <button
                 type="button"
                 onClick={() => setShowRulesHelper(!showRulesHelper)}
-                className="w-full flex items-center justify-between text-left text-xs font-medium text-slate-500 hover:text-slate-700 py-1 transition-colors"
+                className="w-full flex items-center justify-between text-left text-xs font-medium text-[#737873] hover:text-[#1A1D1A] py-1 transition-colors"
               >
                 <span className="flex items-center gap-1.5">
-                  <Shield className="h-3.5 w-3.5 text-indigo-500" />
+                  <Shield className="h-3.5 w-3.5 text-[#5B7083]" />
                   Règles de sécurité Firestore (Console Firebase)
                 </span>
                 {showRulesHelper ? (
@@ -475,19 +475,19 @@ service cloud.firestore {
               </button>
 
               {showRulesHelper && (
-                <div className="mt-2 p-3 bg-slate-900 rounded-xl text-slate-200 text-xs font-mono">
+                <div className="mt-2 p-3 bg-[#1A1D1A] rounded-xl text-[#F9F8F6] text-xs font-mono">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] text-slate-400 font-sans">
+                    <span className="text-[11px] text-[#737873] font-sans">
                       firestore.rules (à copier dans Firebase Console) :
                     </span>
                     <button
                       type="button"
                       onClick={handleCopyRules}
-                      className="flex items-center gap-1 px-2 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[11px] font-sans transition-colors"
+                      className="flex items-center gap-1 px-2.5 py-1 bg-[#6B8E78] hover:bg-[#5d7c68] text-white rounded-lg text-[11px] font-sans transition-colors"
                     >
                       {copiedRules ? (
                         <>
-                          <Check className="h-3 w-3 text-emerald-300" />
+                          <Check className="h-3 w-3 text-white" />
                           Copié !
                         </>
                       ) : (
@@ -498,12 +498,9 @@ service cloud.firestore {
                       )}
                     </button>
                   </div>
-                  <pre className="text-[10px] leading-relaxed overflow-x-auto text-indigo-200 bg-slate-950 p-2.5 rounded-lg border border-slate-800 max-h-40">
+                  <pre className="text-[10px] leading-relaxed overflow-x-auto text-[#A3B19B] bg-black/40 p-2.5 rounded-lg border border-white/10 max-h-40">
                     {FIRESTORE_RULES_SNIPPET}
                   </pre>
-                  <p className="mt-2 text-[10px] text-slate-400 font-sans">
-                    Collez ce contenu dans votre onglet <strong>Firestore Database &gt; Règles</strong> dans votre console Firebase, puis cliquez sur <strong>Publier</strong>.
-                  </p>
                 </div>
               )}
             </div>

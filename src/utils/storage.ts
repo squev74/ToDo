@@ -117,13 +117,16 @@ export function getDefaultTasks(
       statut: 'In Progress',
       dateEcheance: futureDateStr,
       dateRealisation: null,
-      dateModification: nowIso,
+      createdAt: new Date(Date.now() - 3600000 * 24 * 2).toISOString(),
+      updatedAt: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
+      lastActivityAt: new Date(Date.now() - 3600000 * 24 * 1).toISOString(), // 1 jour d'inactivité (< 3 jours -> gris)
+      dateModification: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
       ordre: 1,
       commentaires: [
         {
           id: 'comm-1',
           texte: 'Démarrage de la revue de code sur le module auth.',
-          date: new Date(Date.now() - 3600000 * 3).toISOString(),
+          date: new Date(Date.now() - 3600000 * 24 * 1).toISOString(),
         },
       ],
     },
@@ -137,7 +140,10 @@ export function getDefaultTasks(
       statut: 'Open',
       dateEcheance: pastDateStr, // En retard intentionnellement
       dateRealisation: null,
-      dateModification: nowIso,
+      createdAt: new Date(Date.now() - 3600000 * 24 * 6).toISOString(),
+      updatedAt: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
+      lastActivityAt: new Date(Date.now() - 3600000 * 24 * 5).toISOString(), // 5 jours d'inactivité (3 à 7 jours -> orange)
+      dateModification: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
       ordre: 2,
       commentaires: [],
     },
@@ -151,6 +157,9 @@ export function getDefaultTasks(
       statut: 'Done',
       dateEcheance: today,
       dateRealisation: new Date(Date.now() - 3600000 * 4).toISOString(),
+      createdAt: new Date(Date.now() - 3600000 * 24 * 10).toISOString(),
+      updatedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+      lastActivityAt: new Date(Date.now() - 3600000 * 4).toISOString(),
       dateModification: new Date(Date.now() - 3600000 * 4).toISOString(),
       ordre: 3,
       commentaires: [
@@ -171,13 +180,16 @@ export function getDefaultTasks(
       statut: 'Blocked',
       dateEcheance: futureDateStr,
       dateRealisation: null,
-      dateModification: nowIso,
+      createdAt: new Date(Date.now() - 3600000 * 24 * 12).toISOString(),
+      updatedAt: new Date(Date.now() - 3600000 * 24 * 9).toISOString(),
+      lastActivityAt: new Date(Date.now() - 3600000 * 24 * 9).toISOString(), // 9 jours d'inactivité (> 7 jours -> rouge intense animate-pulse)
+      dateModification: new Date(Date.now() - 3600000 * 24 * 9).toISOString(),
       ordre: 4,
       commentaires: [
         {
           id: 'comm-3',
           texte: 'Bloqué : En attente de la fenêtre de maintenance approuvée par le DevOps.',
-          date: new Date(Date.now() - 3600000 * 2).toISOString(),
+          date: new Date(Date.now() - 3600000 * 24 * 9).toISOString(),
         },
       ],
     },
@@ -191,6 +203,9 @@ export function getDefaultTasks(
       statut: 'Open',
       dateEcheance: futureDateStr,
       dateRealisation: null,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      lastActivityAt: nowIso, // < 3 jours (aujourd'hui) -> gris
       dateModification: nowIso,
       ordre: 5,
       commentaires: [],
