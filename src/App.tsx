@@ -83,6 +83,12 @@ import {
   createNewTask,
 } from './services/taskService';
 
+// Module Timesheet et imputations de temps JIRA
+import { TimesheetGrid } from './components/TimesheetGrid';
+import { TimesheetReportModal } from './components/TimesheetReportModal';
+import { TimeEntry } from './types/timesheet';
+import { fetchMonthTimeEntries, saveTimeEntry } from './services/timesheetService';
+
 export default function App() {
   const { user, loading: authLoading, logout, isAdmin, isApproved } = useAuth();
 
@@ -112,8 +118,8 @@ export default function App() {
     }
   };
 
-  // Navigation Vue Principale : 'tasks' | 'backlog' | 'report' | 'admin'
-  const [currentView, setCurrentView] = useState<'tasks' | 'backlog' | 'report' | 'admin'>('tasks');
+  // Navigation Vue Principale : 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin'
+  const [currentView, setCurrentView] = useState<'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin'>('tasks');
   const [taskModalDefaultStatus, setTaskModalDefaultStatus] = useState<StatutTache>('Open');
 
   // Filtres et Recherche Multi-Sélection (null = tous visibles / aucun filtre appliqué, [] = aucun sélectionné)
@@ -143,6 +149,55 @@ export default function App() {
   const handleOpenActivityReportModal = (startDate?: string, endDate?: string) => {
     setActivityReportDates({ start: startDate, end: endDate });
     setIsActivityReportModalOpen(true);
+  };
+
+  // Suivi des temps et rapport mensuel JIRA
+  const [isTimesheetReportOpen, setIsTimesheetReportOpen] = useState(false);
+  const [timesheetReportMonth, setTimesheetReportMonth] = useState<{ year: number; month: number }>({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+  });
+  const [timesheetEntriesForReport, setTimesheetEntriesForReport] = useState<TimeEntry[]>([]);
+
+  const handleOpenTimesheetReport = async (year: number, month: number) => {
+    if (!user) return;
+    try {
+      const data = await fetchMonthTimeEntries(user.uid, activeSpaceId, year, month);
+      setTimesheetReportMonth({ year, month });
+      setTimesheetEntriesForReport(data);
+      setIsTimesheetReportOpen(true);
+    } catch (err) {
+      console.error(err);
+      showToast('Impossible de charger les données du rapport.');
+    }
+  };
+
+  // Quick logging of JIRA time from individual task card
+  const handleQuickLogTime = async (jiraKey: string, hours: number, comment: string) => {
+    if (!user) return;
+    try {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const todayStr = `${y}-${m}-${day}`;
+
+      const project = projects.find((p) => p.jiraKey === jiraKey);
+      const projectName = project ? project.nom : 'Projet JIRA';
+
+      await saveTimeEntry(user.uid, activeSpaceId, {
+        jiraKey,
+        projectName,
+        date: todayStr,
+        hours,
+        comment,
+      });
+
+      showToast(`+${hours}h loggées sur ${jiraKey} pour aujourd'hui !`);
+    } catch (err) {
+      console.error('Erreur QuickLogTime:', err);
+      showToast('Échec de la saisie rapide de temps.', 'error');
+    }
   };
 
   // Modale Motif Bloqué (Règle 4)
@@ -699,6 +754,7 @@ export default function App() {
     titre: string;
     description: string;
     projetId: string | null;
+    jiraKey?: string;
     statut: StatutTache;
     dateEcheance?: string | null;
     blockedReason?: string;
@@ -723,6 +779,7 @@ export default function App() {
 
       updatedTask = {
         ...updatedTask,
+        jiraKey: taskData.jiraKey,
         userId: user?.uid || editingTask.userId,
         spaceId: editingTask.spaceId || currentSpace.id,
         commentaires: comments,
@@ -759,6 +816,10 @@ export default function App() {
         ordre: maxOrdre + 1,
         initialComments: comments,
       });
+
+      if (taskData.jiraKey) {
+        newTask.jiraKey = taskData.jiraKey;
+      }
 
       setTasks((prev) => [newTask, ...prev]);
 
@@ -934,7 +995,7 @@ export default function App() {
   };
 
   // Projets : Ajout dans l'espace actif
-  const handleAddProject = (nom: string, couleur: string) => {
+  const handleAddProject = (nom: string, couleur: string, jiraKey?: string) => {
     const newProj: Projet = {
       id: 'proj-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
       userId: user?.uid,
@@ -942,6 +1003,7 @@ export default function App() {
       nom,
       couleur,
       dateCreation: new Date().toISOString(),
+      jiraKey,
     };
     setProjects((prev) => [...prev, newProj]);
 
@@ -952,6 +1014,48 @@ export default function App() {
     }
 
     showToast(`Projet « ${nom} » créé dans « ${currentSpace.nom} ».`);
+  };
+
+  // Projets : Mise à jour dans l'espace actif
+  const handleUpdateProject = (projectId: string, nom: string, couleur: string, jiraKey?: string) => {
+    const updatedProj = projects.find((p) => p.id === projectId);
+    if (!updatedProj) return;
+
+    const newProj: Projet = {
+      ...updatedProj,
+      nom,
+      couleur,
+      jiraKey,
+    };
+
+    setProjects((prev) =>
+      prev.map((p) => (p.id === projectId ? newProj : p))
+    );
+
+    // Mettre à jour les tâches associées pour garder la clé JIRA synchronisée
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.projetId === projectId
+          ? { ...t, jiraKey }
+          : t
+      )
+    );
+
+    if (user && !user.isLocalFallback) {
+      saveProjectToFirestore(user.uid, newProj).catch((err) => {
+        console.error('Erreur Firestore mise à jour projet:', err);
+      });
+      
+      const tasksToUpdate = tasks.filter((t) => t.projetId === projectId);
+      tasksToUpdate.forEach((t) => {
+        const updatedTask = { ...t, jiraKey };
+        saveTaskToFirestore(user.uid, updatedTask).catch((err) => {
+          console.error('Erreur Firestore mise à jour tâche projet:', err);
+        });
+      });
+    }
+
+    showToast(`Projet « ${nom} » mis à jour.`);
   };
 
   // Projets : Demande de suppression dans l'espace actif
@@ -1353,6 +1457,7 @@ export default function App() {
                       onRequestDelete={handleRequestDeleteTask}
                       onDelete={handleRequestDeleteTask}
                       onAddComment={handleAddCommentToTask}
+                      onQuickLogTime={handleQuickLogTime}
                       onDragStart={handleDragStart}
                       onDragOver={handleDragOver}
                       onDragEnd={handleDragEnd}
@@ -1365,6 +1470,22 @@ export default function App() {
               )}
             </div>
           </div>
+        ) : currentView === 'timesheet' ? (
+          <TimesheetGrid
+            userId={user.uid}
+            spaceId={currentSpace.id}
+            spaceName={currentSpace.nom}
+            globalProjects={currentSpaceProjects}
+            onCreateGlobalProject={async (nom, jiraKey) => {
+              // Créer le projet avec une couleur par défaut
+              await handleAddProject(nom, '#6B8E78', jiraKey);
+            }}
+            onUpdateGlobalProject={async (id, nom, jiraKey) => {
+              const existingColor = projects.find((p) => p.id === id)?.couleur || '#6B8E78';
+              handleUpdateProject(id, nom, existingColor, jiraKey);
+            }}
+            onOpenReportModal={handleOpenTimesheetReport}
+          />
         ) : (
           /* PANNEAU DAILY REPORT DE L'ESPACE ACTIF (Exclut le Backlog) */
           <DailyReportPanel
@@ -1431,6 +1552,7 @@ export default function App() {
         tasks={currentSpaceTasks}
         activeSpace={currentSpace}
         onAddProject={handleAddProject}
+        onUpdateProject={handleUpdateProject}
         onRequestDeleteProject={handleRequestDeleteProject}
         onClose={() => setIsProjectModalOpen(false)}
       />
@@ -1481,6 +1603,18 @@ export default function App() {
         activeSpace={currentSpace}
         initialStartDate={activityReportDates.start}
         initialEndDate={activityReportDates.end}
+      />
+
+      {/* MODALE COMPTE-RENDU MENSUEL TIMESHEET AVEC IA (GEMINI FLASH) */}
+      <TimesheetReportModal
+        isOpen={isTimesheetReportOpen}
+        onClose={() => setIsTimesheetReportOpen(false)}
+        userId={user.uid}
+        spaceId={currentSpace.id}
+        spaceName={currentSpace.nom}
+        year={timesheetReportMonth.year}
+        month={timesheetReportMonth.month}
+        entries={timesheetEntriesForReport}
       />
     </div>
   );

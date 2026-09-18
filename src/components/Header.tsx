@@ -13,14 +13,15 @@ import {
   Zap,
   Cloud,
   Sparkles,
+  Clock,
 } from 'lucide-react';
 import { Espace, Tache, Projet, ADMIN_EMAIL, ADMIN_UID } from '../types';
 import { WorkspaceSelector } from './WorkspaceSelector';
 import { useAuth } from '../context/AuthContext';
 
 export interface HeaderProps {
-  currentView: 'tasks' | 'backlog' | 'report' | 'admin';
-  onViewChange: (view: 'tasks' | 'backlog' | 'report' | 'admin') => void;
+  currentView: 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin';
+  onViewChange: (view: 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin') => void;
   spaces: Espace[];
   activeSpaceId: string;
   tasks: Tache[];
@@ -319,7 +320,22 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <CalendarCheck className="h-3.5 w-3.5" />
-              <span>Rapport d'Activité & Suivi</span>
+              <span>Rapport d&apos;Activité & Suivi</span>
+            </button>
+
+            {/* Onglet : Feuille de temps */}
+            <button
+              id="tab-view-timesheet"
+              type="button"
+              onClick={() => onViewChange('timesheet')}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
+                currentView === 'timesheet'
+                  ? 'bg-indigo-600 text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)]'
+                  : 'text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A]'
+              }`}
+            >
+              <Clock className="h-3.5 w-3.5" />
+              <span>Feuille de Temps</span>
             </button>
 
             {/* Onglet : Administration - Visible UNIQUEMENT pour 'squeva11@gmail.com' ou role === 'admin' */}

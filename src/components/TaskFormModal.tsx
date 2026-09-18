@@ -11,6 +11,7 @@ interface TaskFormModalProps {
     titre: string;
     description: string;
     projetId: string | null;
+    jiraKey?: string;
     statut: StatutTache;
     dateEcheance?: string | null;
     blockedReason?: string;
@@ -29,6 +30,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [titre, setTitre] = useState('');
   const [description, setDescription] = useState('');
   const [projetId, setProjetId] = useState<string | null>(null);
+  const [jiraKey, setJiraKey] = useState('');
   const [statut, setStatut] = useState<StatutTache>(defaultStatus || 'Open');
   const [dateEcheance, setDateEcheance] = useState('');
   const [blockedReason, setBlockedReason] = useState('');
@@ -39,6 +41,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setTitre(initialTask.titre);
       setDescription(initialTask.description || '');
       setProjetId(initialTask.projetId || null);
+      setJiraKey(initialTask.jiraKey || '');
       setStatut(initialTask.statut);
       setDateEcheance(initialTask.dateEcheance || '');
       setBlockedReason('');
@@ -46,6 +49,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setTitre('');
       setDescription('');
       setProjetId(projects.length > 0 ? projects[0].id : null);
+      setJiraKey('');
       setStatut(defaultStatus || 'Open');
       setDateEcheance('');
       setBlockedReason('');
@@ -71,6 +75,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       titre: titre.trim(),
       description: description.trim(),
       projetId: projetId || null,
+      jiraKey: jiraKey.trim() || undefined,
       statut,
       dateEcheance: dateEcheance.trim() ? dateEcheance.trim() : null,
       blockedReason: statut === 'Blocked' ? blockedReason.trim() : undefined,
@@ -198,6 +203,41 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 <option value="Backlog">Backlog (En attente)</option>
               </select>
             </div>
+          </div>
+
+          <div className="rounded-xl border border-[#F0EFEB] bg-[#F9F8F6]/40 p-3.5 space-y-2.5">
+            <label
+              htmlFor="task-jirakey-select"
+              className="block text-xs font-semibold text-[#5B7083]"
+            >
+              Imputation JIRA associée (Optionnelle)
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <select
+                id="task-jirakey-select"
+                value={['EVOLIT-24', 'EVOLIT-94', 'PMOIT-1845', 'Vacances/Maladie', 'PMO-GENERAL'].includes(jiraKey) ? jiraKey : ''}
+                onChange={(e) => setJiraKey(e.target.value)}
+                className="rounded-lg border border-[#F0EFEB] bg-white px-2.5 py-1.5 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden"
+              >
+                <option value="">-- Sélectionner --</option>
+                <option value="EVOLIT-24">EVOLIT-24 (Produit V24)</option>
+                <option value="EVOLIT-94">EVOLIT-94 (Performance)</option>
+                <option value="PMOIT-1845">PMOIT-1845 (Cloud)</option>
+                <option value="Vacances/Maladie">Absences & Congés</option>
+                <option value="PMO-GENERAL">PMO & Support</option>
+              </select>
+              <input
+                id="task-jirakey-input"
+                type="text"
+                value={jiraKey}
+                onChange={(e) => setJiraKey(e.target.value)}
+                placeholder="Saisir clé JIRA libre (PROJ-123)"
+                className="rounded-lg border border-[#F0EFEB] bg-white px-3 py-1.5 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden"
+              />
+            </div>
+            <p className="text-[10px] text-[#737873]">
+              Permet de logger du temps directement depuis la carte de tâche.
+            </p>
           </div>
 
           {statut === 'Blocked' && initialTask?.statut !== 'Blocked' && (

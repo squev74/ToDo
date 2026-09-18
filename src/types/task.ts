@@ -13,6 +13,7 @@ export interface Tache {
   titre: string;
   description: string;
   projetId: string | null;
+  jiraKey?: string; // Clé JIRA associée (ex: 'EVOLIT-24')
   statut: StatutTache;
   dateEcheance?: string | null; // Format YYYY-MM-DD
   dateRealisation: string | null; // Horodatage ISO automatique quand statut passe à 'Done'

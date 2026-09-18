@@ -40,6 +40,7 @@ export interface Tache {
   titre: string;
   description: string;
   projetId: string | null;
+  jiraKey?: string; // Clé JIRA associée (ex: 'EVOLIT-24')
   statut: StatutTache;
   dateEcheance?: string | null; // Format YYYY-MM-DD
   dateRealisation: string | null; // Horodatage ISO automatique quand statut passe à 'Done'
@@ -60,6 +61,7 @@ export interface Projet {
   nom: string;
   couleur: string; // Code couleur hex ou classe Tailwind
   dateCreation: string;
+  jiraKey?: string; // Clé JIRA ou code unique du projet (ex: EVOLIT-24)
 }
 
 export interface AppDataExport {

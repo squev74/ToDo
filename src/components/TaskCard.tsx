@@ -40,6 +40,7 @@ export interface TaskCardProps {
   isDragOver?: boolean;
   isDragged?: boolean;
   onPromote?: (task: Tache) => void;
+  onQuickLogTime?: (jiraKey: string, hours: number, comment: string) => void;
 }
 
 export type TaskItemProps = TaskCardProps;
@@ -139,9 +140,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onDrop,
   isDragOver = false,
   onPromote,
+  onQuickLogTime,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [newCommentText, setNewCommentText] = useState('');
+  const [loggedHours, setLoggedHours] = useState<number | null>(null);
 
   // Handlers sécurisés
   const handleStatusChange = onStatusChangeRequest || onStatusChange || (() => {});
@@ -330,6 +333,17 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             </span>
           )}
 
+          {/* BADGE DE CLÉ JIRA SI PRÉSENT */}
+          {task.jiraKey && (
+            <span
+              id={`task-jirakey-badge-${task.id}`}
+              className="inline-flex items-center gap-1 bg-indigo-600 text-white px-2 py-0.5 rounded-md font-bold text-[10px] shadow-2xs shrink-0 tracking-wider transition-transform hover:scale-105"
+              title={`Clé JIRA associée : ${task.jiraKey}. Cliquer pour déplier et imputer du temps rapidement.`}
+            >
+              <span>{task.jiraKey}</span>
+            </span>
+          )}
+
           {/* HIGHLIGHT ALERTE TÂCHE EN RETARD (Badge Rouge Vif Néon) */}
           {isOverdue && (
             <span
@@ -513,6 +527,56 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               </span>
             )}
           </div>
+
+          {/* SAISIE DU TEMPS RAPIDE JIRA */}
+          {task.jiraKey && (
+            <div
+              id={`task-quick-time-tracker-${task.id}`}
+              className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-2.5 transition-all"
+            >
+              <div className="flex items-center justify-between">
+                <h5 className="text-xs font-semibold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-indigo-500" />
+                  Saisie de temps rapide (JIRA : {task.jiraKey})
+                </h5>
+                <span className="text-[10px] text-indigo-600/70">Aujourd&apos;hui</span>
+              </div>
+
+              {loggedHours !== null ? (
+                <div className="flex items-center gap-2 rounded-lg bg-emerald-500 text-white px-3 py-1.5 text-xs font-semibold animate-in fade-in duration-150">
+                  <Check className="h-4 w-4 stroke-[2.5]" />
+                  <span>+{loggedHours}h loggées avec succès sur {task.jiraKey} !</span>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-slate-600 mr-1 font-medium">Imputer :</span>
+                  {[1, 2, 4].map((hours) => (
+                    <button
+                      key={hours}
+                      type="button"
+                      onClick={() => {
+                        if (onQuickLogTime) {
+                          onQuickLogTime(
+                            task.jiraKey!,
+                            hours,
+                            `Imputation rapide depuis la tâche : ${task.titre}`
+                          );
+                          setLoggedHours(hours);
+                          setTimeout(() => setLoggedHours(null), 2500);
+                        }
+                      }}
+                      className="inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                    >
+                      +{hours}h
+                    </button>
+                  ))}
+                  <p className="text-[10px] text-slate-500 italic ml-auto shrink-0">
+                    S&apos;ajoute à votre feuille de temps mensuelle
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Fil de commentaires */}
           <div className="pt-2 border-t border-slate-200 space-y-2.5">
