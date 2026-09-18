@@ -144,6 +144,7 @@ export function sanitizeProjectForFirestore(project: Projet, userId: string): Re
     nom: project.nom || '',
     couleur: project.couleur || '#6366f1',
     dateCreation: project.dateCreation || new Date().toISOString(),
+    jiraKey: project.jiraKey || null,
   });
 }
 

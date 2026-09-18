@@ -636,7 +636,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse table-fixed min-w-[1200px]">
+            <table className="w-full text-left border-collapse table-fixed min-w-[1600px]">
               {/* EN-TÊTE DU TABLEAU */}
               <thead>
                 <tr className="bg-[#F9F8F6] border-b border-[#F0EFEB]">
@@ -715,7 +715,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
                                   handleHoursChange(d.dateStr, p.code, p.name, e.target.value)
                                 }
                                 placeholder="0"
-                                className={`w-full text-center h-8 text-xs font-medium rounded-lg border focus:outline-none focus:ring-2 transition-all ${
+                                className={`w-full text-center h-8 text-xs font-medium rounded-lg border px-0.5 focus:outline-none focus:ring-2 transition-all ${
                                   cellValue
                                     ? 'bg-indigo-50/70 text-indigo-900 border-indigo-200 focus:ring-indigo-100 focus:border-indigo-500'
                                     : 'bg-transparent text-slate-400 border-slate-100 hover:border-slate-200 focus:ring-slate-100'
