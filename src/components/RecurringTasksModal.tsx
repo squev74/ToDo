@@ -20,6 +20,8 @@ import {
   RecurrenceType,
   RECURRENCE_OPTIONS,
   DAYS_OF_WEEK,
+  RecurrenceConfig,
+  RecurrenceFrequency,
 } from '../types/recurringTask';
 import { Projet, Tache } from '../types';
 import {
@@ -29,6 +31,7 @@ import {
   getRecommendedFirstRunDate,
 } from '../services/recurringTaskService';
 import { getTodayDateString } from '../utils/storage';
+import { RecurrenceSelector } from './RecurrenceSelector';
 
 interface RecurringTasksModalProps {
   isOpen: boolean;
@@ -71,6 +74,12 @@ export const RecurringTasksModal: React.FC<RecurringTasksModalProps> = ({
   const [nextRunDate, setNextRunDate] = useState<string>(todayStr);
   const [isActive, setIsActive] = useState<boolean>(true);
 
+  // Nouveaux états de récurrence avancée
+  const [interval, setInterval] = useState<number>(1);
+  const [quarterlyOption, setQuarterlyOption] = useState<'same_day' | 'specific_day'>('same_day');
+  const [specificDayIndex, setSpecificDayIndex] = useState<'first' | 'second' | 'third' | 'last'>('first');
+  const [specificDayWeek, setSpecificDayWeek] = useState<number>(1);
+
   // Notifications locales d'action
   const [feedbackMessage, setFeedbackMessage] = useState<{
     type: 'success' | 'info';
@@ -111,6 +120,10 @@ export const RecurringTasksModal: React.FC<RecurringTasksModalProps> = ({
     setRecurrenceType('workdays');
     setDayOfWeek(1);
     setDayOfMonth(1);
+    setInterval(1);
+    setQuarterlyOption('same_day');
+    setSpecificDayIndex('first');
+    setSpecificDayWeek(1);
     // Par défaut, débuter au prochain cycle (demain pour jours ouvrés) -> 0 tâche aujourd'hui
     setNextRunDate(getRecommendedFirstRunDate('workdays'));
     setIsActive(true);
@@ -125,6 +138,10 @@ export const RecurringTasksModal: React.FC<RecurringTasksModalProps> = ({
     setRecurrenceType(template.recurrenceType);
     setDayOfWeek(template.dayOfWeek !== undefined ? template.dayOfWeek : 1);
     setDayOfMonth(template.dayOfMonth !== undefined ? template.dayOfMonth : 1);
+    setInterval(template.interval !== undefined ? template.interval : 1);
+    setQuarterlyOption(template.quarterlyOption || 'same_day');
+    setSpecificDayIndex(template.specificDayIndex || 'first');
+    setSpecificDayWeek(template.specificDayWeek !== undefined ? template.specificDayWeek : 1);
     setNextRunDate(template.nextRunDate);
     setIsActive(template.isActive);
     setActiveTab('form');
@@ -142,8 +159,8 @@ export const RecurringTasksModal: React.FC<RecurringTasksModalProps> = ({
       title: title.trim(),
       description: description.trim(),
       recurrenceType,
-      dayOfWeek: recurrenceType === 'weekly' ? dayOfWeek : undefined,
-      dayOfMonth: recurrenceType === 'monthly' ? dayOfMonth : undefined,
+      dayOfWeek: recurrenceType === 'weekly' ? dayOfWeek : (recurrenceType === 'quarterly' && quarterlyOption === 'specific_day' ? specificDayWeek : undefined),
+      dayOfMonth: (recurrenceType === 'monthly' || recurrenceType === 'quarterly' || recurrenceType === 'yearly') ? dayOfMonth : undefined,
       nextRunDate: nextRunDate || todayStr,
       isActive,
       createdAt: editingTemplateId
@@ -152,6 +169,10 @@ export const RecurringTasksModal: React.FC<RecurringTasksModalProps> = ({
       lastGeneratedDate: editingTemplateId
         ? templates.find((t) => t.id === editingTemplateId)?.lastGeneratedDate
         : null,
+      interval: (recurrenceType === 'quarterly' || recurrenceType === 'yearly' || recurrenceType === 'daily' || recurrenceType === 'weekly' || recurrenceType === 'monthly') ? interval : 1,
+      quarterlyOption: recurrenceType === 'quarterly' ? quarterlyOption : undefined,
+      specificDayIndex: (recurrenceType === 'quarterly' && quarterlyOption === 'specific_day') ? specificDayIndex : undefined,
+      specificDayWeek: (recurrenceType === 'quarterly' && quarterlyOption === 'specific_day') ? specificDayWeek : undefined,
     };
 
     await onSaveTemplate(templateToSave);
@@ -427,7 +448,13 @@ export const RecurringTasksModal: React.FC<RecurringTasksModalProps> = ({
                                   {formatRecurrenceLabel(
                                     template.recurrenceType,
                                     template.dayOfWeek,
-                                    template.dayOfMonth
+                                    template.dayOfMonth,
+                                    {
+                                      interval: template.interval,
+                                      quarterlyOption: template.quarterlyOption,
+                                      specificDayIndex: template.specificDayIndex,
+                                      specificDayWeek: template.specificDayWeek,
+                                    }
                                   )}
                                 </span>
                               </span>
@@ -569,109 +596,37 @@ export const RecurringTasksModal: React.FC<RecurringTasksModalProps> = ({
               </div>
 
               {/* Section Fréquence */}
-              <div className="rounded-2xl border border-[#F0EFEB] bg-[#F9F8F6]/50 p-4.5 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Repeat className="h-4 w-4 text-[#6B8E78]" />
-                  <span className="text-xs font-medium text-[#1A1D1A]">
-                    Périodicité de récurrence
-                  </span>
-                </div>
+              <RecurrenceSelector
+                config={{
+                  frequency: recurrenceType,
+                  interval,
+                  quarterlyOption,
+                  dayOfWeek,
+                  dayOfMonth,
+                  specificDayIndex,
+                  specificDayWeek,
+                }}
+                onChange={(newConfig) => {
+                  setRecurrenceType(newConfig.frequency);
+                  setInterval(newConfig.interval);
+                  if (newConfig.quarterlyOption !== undefined) setQuarterlyOption(newConfig.quarterlyOption);
+                  if (newConfig.dayOfWeek !== undefined) setDayOfWeek(newConfig.dayOfWeek);
+                  if (newConfig.dayOfMonth !== undefined) setDayOfMonth(newConfig.dayOfMonth);
+                  if (newConfig.specificDayIndex !== undefined) setSpecificDayIndex(newConfig.specificDayIndex);
+                  if (newConfig.specificDayWeek !== undefined) setSpecificDayWeek(newConfig.specificDayWeek);
 
-                {/* Sélecteur type de récurrence */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {RECURRENCE_OPTIONS.map((opt) => {
-                    const isSelected = recurrenceType === opt.type;
-                    return (
-                      <button
-                        key={opt.type}
-                        type="button"
-                        onClick={() => {
-                          setRecurrenceType(opt.type);
-                          if (!editingTemplateId) {
-                            setNextRunDate(getRecommendedFirstRunDate(opt.type, { dayOfWeek, dayOfMonth }));
-                          }
-                        }}
-                        className={`text-left rounded-xl border p-3 transition-all ${
-                          isSelected
-                            ? 'border-[#6B8E78] bg-white ring-1 ring-[#6B8E78]'
-                            : 'border-[#F0EFEB] bg-white hover:border-[#E2DFD8]'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-xs font-medium text-[#1A1D1A]">{opt.label}</span>
-                          {isSelected && <Check className="h-4 w-4 text-[#6B8E78]" />}
-                        </div>
-                        <p className="text-[11px] text-[#737873] leading-tight font-light">
-                          {opt.description}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Options complémentaires si Hebdomadaire */}
-                {recurrenceType === 'weekly' && (
-                  <div className="pt-2 border-t border-[#F0EFEB]">
-                    <label className="block text-xs font-medium text-[#737873] mb-2">
-                      Quel jour de la semaine répéter ?
-                    </label>
-                    <div className="flex flex-wrap gap-1.5">
-                      {DAYS_OF_WEEK.map((d) => {
-                        const isDaySelected = dayOfWeek === d.value;
-                        return (
-                          <button
-                            key={d.value}
-                            type="button"
-                            onClick={() => {
-                              setDayOfWeek(d.value);
-                              if (!editingTemplateId) {
-                                setNextRunDate(getRecommendedFirstRunDate('weekly', { dayOfWeek: d.value }));
-                              }
-                            }}
-                            className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-all border ${
-                              isDaySelected
-                                ? 'bg-[#6B8E78] text-white border-[#6B8E78]'
-                                : 'bg-white text-[#1A1D1A] border-[#F0EFEB] hover:bg-[#F0EFEB]'
-                            }`}
-                          >
-                            {d.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Options complémentaires si Mensuel */}
-                {recurrenceType === 'monthly' && (
-                  <div className="pt-2 border-t border-[#F0EFEB] flex items-center gap-3">
-                    <label
-                      htmlFor="template-day-of-month"
-                      className="text-xs font-medium text-[#737873]"
-                    >
-                      Le jour du mois :
-                    </label>
-                    <select
-                      id="template-day-of-month"
-                      value={dayOfMonth}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setDayOfMonth(val);
-                        if (!editingTemplateId) {
-                          setNextRunDate(getRecommendedFirstRunDate('monthly', { dayOfMonth: val }));
-                        }
-                      }}
-                      className="rounded-xl border border-[#F0EFEB] bg-white px-2.5 py-1 text-xs font-normal text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden"
-                    >
-                      {Array.from({ length: 31 }, (_, i) => i + 1).map((n) => (
-                        <option key={n} value={n}>
-                          {n === 1 ? '1er du mois' : `Le ${n}`}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </div>
+                  if (!editingTemplateId) {
+                    setNextRunDate(getRecommendedFirstRunDate(newConfig.frequency, {
+                      dayOfWeek: newConfig.dayOfWeek !== undefined ? newConfig.dayOfWeek : dayOfWeek,
+                      dayOfMonth: newConfig.dayOfMonth !== undefined ? newConfig.dayOfMonth : dayOfMonth,
+                      interval: newConfig.interval,
+                      quarterlyOption: newConfig.quarterlyOption || quarterlyOption,
+                      specificDayIndex: newConfig.specificDayIndex || specificDayIndex,
+                      specificDayWeek: newConfig.specificDayWeek !== undefined ? newConfig.specificDayWeek : specificDayWeek,
+                    }));
+                  }
+                }}
+              />
 
               {/* Date de première exécution */}
               <div className="rounded-2xl border border-[#F0EFEB] bg-[#F9F8F6]/50 p-4.5 space-y-3">
@@ -687,7 +642,14 @@ export const RecurringTasksModal: React.FC<RecurringTasksModalProps> = ({
                   <button
                     type="button"
                     onClick={() =>
-                      setNextRunDate(getRecommendedFirstRunDate(recurrenceType, { dayOfWeek, dayOfMonth }))
+                      setNextRunDate(getRecommendedFirstRunDate(recurrenceType, {
+                        dayOfWeek,
+                        dayOfMonth,
+                        interval,
+                        quarterlyOption,
+                        specificDayIndex,
+                        specificDayWeek,
+                      }))
                     }
                     className={`text-left rounded-xl border p-2.5 transition-all ${
                       nextRunDate > todayStr

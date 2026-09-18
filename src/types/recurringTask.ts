@@ -1,4 +1,16 @@
-export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'workdays';
+export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'workdays' | 'quarterly' | 'yearly';
+
+export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'workdays' | 'quarterly' | 'yearly';
+
+export interface RecurrenceConfig {
+  frequency: RecurrenceFrequency;
+  interval: number; // ex: 1 = tous les trimestres, 2 = tous les 2 trimestres / 6 mois
+  quarterlyOption?: 'same_day' | 'specific_day';
+  dayOfWeek?: number; // 0-6 (pour 'weekly' ou 'specific_day' trimestriel)
+  dayOfMonth?: number; // 1-31 (pour 'monthly' ou 'same_day' trimestriel)
+  specificDayIndex?: 'first' | 'second' | 'third' | 'last';
+  specificDayWeek?: number; // 0-6
+}
 
 export interface RecurringTaskTemplate {
   id: string;
@@ -14,6 +26,12 @@ export interface RecurringTaskTemplate {
   isActive: boolean;
   createdAt?: string;
   lastGeneratedDate?: string | null;
+  
+  // Nouveaux champs pour la récurrence avancée
+  interval?: number; // ex: 1 = chaque trimestre, etc.
+  quarterlyOption?: 'same_day' | 'specific_day';
+  specificDayIndex?: 'first' | 'second' | 'third' | 'last';
+  specificDayWeek?: number; // 0-6
 }
 
 export interface RecurrenceConfigOption {
@@ -47,6 +65,18 @@ export const RECURRENCE_OPTIONS: RecurrenceConfigOption[] = [
     label: 'Mensuel',
     description: 'Un jour fixe du mois (ex: chaque 1er ou 15 du mois)',
     badgeColor: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  },
+  {
+    type: 'quarterly',
+    label: 'Trimestriel',
+    description: 'Tous les 3 mois, le même jour ou un jour spécifique',
+    badgeColor: 'bg-amber-50 text-amber-800 border-amber-200',
+  },
+  {
+    type: 'yearly',
+    label: 'Annuel',
+    description: 'Une fois par an à une date précise',
+    badgeColor: 'bg-rose-50 text-rose-700 border-rose-200',
   },
 ];
 

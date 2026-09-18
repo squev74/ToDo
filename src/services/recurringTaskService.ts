@@ -19,6 +19,7 @@ import {
   getNextWorkdayDateString,
   formatDateToLocalYMD,
 } from '../utils/storage';
+import { calculateNextDueDate, getSpecificWeekdayOfMonth } from '../utils/recurrence';
 
 const RECURRING_CACHE_KEY_PREFIX = 'todolist_recurring_templates_';
 
@@ -43,6 +44,12 @@ function sanitizeTemplateForFirestore(
     isActive: Boolean(template.isActive),
     createdAt: template.createdAt || new Date().toISOString(),
     lastGeneratedDate: template.lastGeneratedDate || null,
+    
+    // Nouveaux champs pour la récurrence avancée
+    interval: template.interval !== undefined ? template.interval : 1,
+    quarterlyOption: template.quarterlyOption || null,
+    specificDayIndex: template.specificDayIndex || null,
+    specificDayWeek: template.specificDayWeek !== undefined ? template.specificDayWeek : null,
   };
 }
 
@@ -76,7 +83,14 @@ export function setCachedRecurringTemplates(
  */
 export function getRecommendedFirstRunDate(
   recurrenceType: RecurrenceType,
-  options?: { dayOfWeek?: number; dayOfMonth?: number }
+  options?: {
+    dayOfWeek?: number;
+    dayOfMonth?: number;
+    interval?: number;
+    quarterlyOption?: 'same_day' | 'specific_day';
+    specificDayIndex?: 'first' | 'second' | 'third' | 'last';
+    specificDayWeek?: number;
+  }
 ): string {
   const todayStr = getTodayDateString();
   const [year, month, day] = todayStr.split('-').map(Number);
@@ -115,62 +129,102 @@ export function getRecommendedFirstRunDate(
       d.setDate(Math.min(targetDayOfMonth, maxDaysNextMonth));
       return formatDateToLocalYMD(d);
     }
+
+    case 'quarterly': {
+      const interval = options?.interval ?? 1;
+      const targetDayOfMonth = options?.dayOfMonth ?? 1;
+      const d = new Date(now.getTime());
+      
+      if (options?.quarterlyOption === 'specific_day') {
+        const specificWeek = options.specificDayWeek !== undefined ? options.specificDayWeek : 1;
+        const specificIdx = options.specificDayIndex || 'first';
+        // Commencer ce trimestre si pas encore passé, ou le trimestre prochain
+        let targetD = getSpecificWeekdayOfMonth(d.getFullYear(), d.getMonth(), specificIdx, specificWeek);
+        if (formatDateToLocalYMD(targetD) <= todayStr) {
+          targetD = getSpecificWeekdayOfMonth(d.getFullYear(), d.getMonth() + 3 * interval, specificIdx, specificWeek);
+        }
+        return formatDateToLocalYMD(targetD);
+      } else {
+        // Option same_day
+        if (d.getDate() < targetDayOfMonth) {
+          const maxDays = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+          d.setDate(Math.min(targetDayOfMonth, maxDays));
+          return formatDateToLocalYMD(d);
+        }
+        d.setMonth(d.getMonth() + 3 * interval);
+        const maxDays = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        d.setDate(Math.min(targetDayOfMonth, maxDays));
+        return formatDateToLocalYMD(d);
+      }
+    }
+
+    case 'yearly': {
+      const targetDayOfMonth = options?.dayOfMonth ?? 1;
+      const d = new Date(now.getTime());
+      // Par défaut on propose dans 1 an
+      d.setFullYear(d.getFullYear() + 1);
+      const maxDays = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(targetDayOfMonth, maxDays));
+      return formatDateToLocalYMD(d);
+    }
+
+    default:
+      return getTomorrowDateString();
   }
 }
 
 /**
  * Calcule la prochaine date d'exécution selon la règle de récurrence (Outlook-like)
  * @param fromDateStr Date de référence (format YYYY-MM-DD)
- * @param recurrenceType 'daily' | 'weekly' | 'monthly' | 'workdays'
- * @param options dayOfWeek (0-6) ou dayOfMonth (1-31)
+ * @param recurrenceType 'daily' | 'weekly' | 'monthly' | 'workdays' | 'quarterly' | 'yearly'
+ * @param options options avancées de récurrence
  */
 export function calculateNextRunDate(
   fromDateStr: string,
   recurrenceType: RecurrenceType,
-  options?: { dayOfWeek?: number; dayOfMonth?: number }
+  options?: {
+    dayOfWeek?: number;
+    dayOfMonth?: number;
+    interval?: number;
+    quarterlyOption?: 'same_day' | 'specific_day';
+    specificDayIndex?: 'first' | 'second' | 'third' | 'last';
+    specificDayWeek?: number;
+  }
 ): string {
-  const [year, month, day] = fromDateStr.split('-').map(Number);
-  const date = new Date(year, month - 1, day, 12, 0, 0);
-
-  switch (recurrenceType) {
-    case 'daily': {
-      // +1 jour calendaire
+  if (recurrenceType === 'workdays') {
+    // Jour ouvré suivant (du lundi au vendredi, saute samedi et dimanche)
+    const [year, month, day] = fromDateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day, 12, 0, 0);
+    date.setDate(date.getDate() + 1);
+    while (date.getDay() === 0 || date.getDay() === 6) {
       date.setDate(date.getDate() + 1);
-      break;
     }
-
-    case 'workdays': {
-      // Jour ouvré suivant (du lundi au vendredi, saute samedi et dimanche)
-      date.setDate(date.getDate() + 1);
-      while (date.getDay() === 0 || date.getDay() === 6) {
-        date.setDate(date.getDate() + 1);
-      }
-      break;
-    }
-
-    case 'weekly': {
-      // Même jour de la semaine la semaine suivante (+7 jours)
-      // Ou recherche du jour choisi si options.dayOfWeek est spécifié
-      date.setDate(date.getDate() + 7);
-      if (options?.dayOfWeek !== undefined && date.getDay() !== options.dayOfWeek) {
-        const diff = (options.dayOfWeek - date.getDay() + 7) % 7;
-        date.setDate(date.getDate() + (diff === 0 ? 7 : diff));
-      }
-      break;
-    }
-
-    case 'monthly': {
-      const targetDayOfMonth = options?.dayOfMonth ?? day;
-      // Passer au mois suivant
-      date.setDate(1); // Évite tout dépassement temporaire
-      date.setMonth(date.getMonth() + 1);
-      const maxDays = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-      date.setDate(Math.min(targetDayOfMonth, maxDays));
-      break;
-    }
+    return formatDateToLocalYMD(date);
   }
 
-  return formatDateToLocalYMD(date);
+  const [year, month, day] = fromDateStr.split('-').map(Number);
+  const fromDate = new Date(year, month - 1, day, 12, 0, 0);
+  
+  const freqMap: Record<string, any> = {
+    daily: 'daily',
+    weekly: 'weekly',
+    monthly: 'monthly',
+    quarterly: 'quarterly',
+    yearly: 'yearly',
+  };
+  
+  const config = {
+    frequency: freqMap[recurrenceType] || 'daily',
+    interval: options?.interval !== undefined ? options.interval : 1,
+    quarterlyOption: options?.quarterlyOption || 'same_day',
+    dayOfWeek: options?.dayOfWeek,
+    dayOfMonth: options?.dayOfMonth !== undefined ? options.dayOfMonth : day,
+    specificDayIndex: options?.specificDayIndex,
+    specificDayWeek: options?.specificDayWeek,
+  };
+  
+  const nextDate = calculateNextDueDate(fromDate, config);
+  return formatDateToLocalYMD(nextDate);
 }
 
 /**
@@ -180,7 +234,14 @@ export function getNextUpcomingRunDate(
   fromDateStr: string,
   recurrenceType: RecurrenceType,
   todayStr: string,
-  options?: { dayOfWeek?: number; dayOfMonth?: number }
+  options?: {
+    dayOfWeek?: number;
+    dayOfMonth?: number;
+    interval?: number;
+    quarterlyOption?: 'same_day' | 'specific_day';
+    specificDayIndex?: 'first' | 'second' | 'third' | 'last';
+    specificDayWeek?: number;
+  }
 ): string {
   let nextDate = calculateNextRunDate(fromDateStr, recurrenceType, options);
   let guard = 0;
@@ -197,8 +258,20 @@ export function getNextUpcomingRunDate(
 export function formatRecurrenceLabel(
   recurrenceType: RecurrenceType,
   dayOfWeek?: number,
-  dayOfMonth?: number
+  dayOfMonth?: number,
+  options?: {
+    interval?: number;
+    quarterlyOption?: 'same_day' | 'specific_day';
+    specificDayIndex?: 'first' | 'second' | 'third' | 'last';
+    specificDayWeek?: number;
+  }
 ): string {
+  const finalOptions = {
+    dayOfWeek,
+    dayOfMonth,
+    ...options,
+  };
+
   switch (recurrenceType) {
     case 'daily':
       return 'Tous les jours';
@@ -210,6 +283,20 @@ export function formatRecurrenceLabel(
     }
     case 'monthly':
       return `Chaque mois le ${dayOfMonth || 1}${dayOfMonth === 1 ? 'er' : ''}`;
+    case 'quarterly': {
+      const label = finalOptions.quarterlyOption === 'specific_day'
+        ? `le ${finalOptions.specificDayIndex === 'first' ? '1er' : finalOptions.specificDayIndex === 'second' ? '2ème' : finalOptions.specificDayIndex === 'third' ? '3ème' : 'dernier'} ${DAYS_OF_WEEK.find(dw => dw.value === finalOptions.specificDayWeek)?.label || 'jour'}`
+        : `le ${finalOptions.dayOfMonth || 1}${finalOptions.dayOfMonth === 1 ? 'er' : ''}`;
+      
+      const intervalVal = finalOptions.interval ?? 1;
+      const freqStr = intervalVal === 1 ? 'trimestre' : `tous les ${intervalVal} trimestres`;
+      return `Chaque ${freqStr}, ${label}`;
+    }
+    case 'yearly': {
+      return `Chaque année le ${finalOptions.dayOfMonth || 1}${finalOptions.dayOfMonth === 1 ? 'er' : ''}`;
+    }
+    default:
+      return 'Planification';
   }
 }
 
@@ -367,6 +454,10 @@ export async function processDueRecurringTasks(params: {
       {
         dayOfWeek: template.dayOfWeek,
         dayOfMonth: template.dayOfMonth,
+        interval: template.interval,
+        quarterlyOption: template.quarterlyOption,
+        specificDayIndex: template.specificDayIndex,
+        specificDayWeek: template.specificDayWeek,
       }
     );
 
@@ -405,7 +496,13 @@ export async function processDueRecurringTasks(params: {
           texte: `⚡ Tâche récurrente planifiée générée automatiquement (Fréquence : ${formatRecurrenceLabel(
             template.recurrenceType,
             template.dayOfWeek,
-            template.dayOfMonth
+            template.dayOfMonth,
+            {
+              interval: template.interval,
+              quarterlyOption: template.quarterlyOption,
+              specificDayIndex: template.specificDayIndex,
+              specificDayWeek: template.specificDayWeek,
+            }
           )}).`,
           date: nowIso,
         },

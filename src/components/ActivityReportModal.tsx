@@ -14,6 +14,7 @@ import {
   FolderGit2,
   Clock,
   Send,
+  Users,
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { Tache, Projet, Espace } from '../types';
@@ -56,12 +57,29 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
   const [dateDebut, setDateDebut] = useState<string>(defaultStart);
   const [dateFin, setDateFin] = useState<string>(defaultEnd);
 
+  // Nouveaux états pour la personnalisation du périmètre et du destinataire
+  const [perimetre, setPerimetre] = useState<'tous' | 'projet'>('tous');
+  const [projetSelectionneId, setProjetSelectionneId] = useState<string>('');
+  const [cible, setCible] = useState<'n1' | 'codir'>('n1');
+
   // 2. États de génération et rendu
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [reportResult, setReportResult] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'preview' | 'raw'>('preview');
   const [copied, setCopied] = useState<boolean>(false);
+
+  // Filtrer les projets appartenant à l'espace actif
+  const spaceProjects = useMemo(() => {
+    return projects.filter((p) => p.spaceId === activeSpace.id);
+  }, [projects, activeSpace.id]);
+
+  // Initialiser automatiquement le projet spécifique s'il y en a de disponibles
+  useEffect(() => {
+    if (spaceProjects.length > 0 && !projetSelectionneId) {
+      setProjetSelectionneId(spaceProjects[0].id);
+    }
+  }, [spaceProjects, projetSelectionneId]);
 
   // Réinitialiser les dates à l'ouverture de la modal si fournies
   useEffect(() => {
@@ -71,7 +89,7 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
     }
   }, [isOpen, initialStartDate, initialEndDate]);
 
-  // 3. Prévisualisation en direct des tâches filtrées sur la période pour l'espace actif
+  // 3. Prévisualisation en direct des tâches filtrées sur la période pour l'espace actif et le périmètre choisi
   const matchingTasks = useMemo(() => {
     if (!isOpen) return [];
     return extractAndPrepareTasks({
@@ -80,8 +98,9 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
       spaceId: activeSpace.id,
       dateDebut,
       dateFin,
+      projetId: perimetre === 'projet' ? projetSelectionneId : undefined,
     });
-  }, [isOpen, tasks, projects, activeSpace.id, dateDebut, dateFin]);
+  }, [isOpen, tasks, projects, activeSpace.id, dateDebut, dateFin, perimetre, projetSelectionneId]);
 
   const uniqueProjectsCount = useMemo(() => {
     return new Set(matchingTasks.map((t) => t.projet)).size;
@@ -128,6 +147,9 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
         spaceName: activeSpace.nom,
         dateDebut,
         dateFin,
+        perimetre,
+        projetSelectionneId: perimetre === 'projet' ? projetSelectionneId : undefined,
+        cible,
       });
 
       if (result.success && result.reportText) {
@@ -157,7 +179,10 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
   // Téléchargement du fichier markdown
   const handleDownloadMarkdown = () => {
     if (!reportResult) return;
-    const filename = `rapport-activite-${activeSpace.nom.toLowerCase().replace(/\s+/g, '-')}-${dateDebut}-au-${dateFin}.md`;
+    const suffix = perimetre === 'projet' && spaceProjects.find((p) => p.id === projetSelectionneId)
+      ? spaceProjects.find((p) => p.id === projetSelectionneId)!.nom.toLowerCase().replace(/\s+/g, '-')
+      : 'tous-projets';
+    const filename = `rapport-activite-${suffix}-${cible}-${dateDebut}-au-${dateFin}.md`;
     const blob = new Blob([reportResult], { type: 'text/markdown;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -252,84 +277,163 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
             </div>
           )}
 
-          {/* Sélecteurs de dates Date Début & Date Fin */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div>
-              <label
-                htmlFor="report-date-debut"
-                className="block text-xs font-medium text-[#737873] mb-1 flex items-center gap-1.5"
-              >
-                <Calendar className="h-3.5 w-3.5 text-[#5B7083]" />
-                <span>Date de début :</span>
-              </label>
-              <input
-                id="report-date-debut"
-                type="date"
-                value={dateDebut}
-                onChange={(e) => setDateDebut(e.target.value)}
-                className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3 py-2 text-xs font-normal text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
-              />
+          {/* Formulaire Grid : Date Début & Date Fin, Périmètre, Destinataire */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Colonne 1 : Filtres de Date */}
+            <div className="space-y-3.5">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label
+                    htmlFor="report-date-debut"
+                    className="block text-xs font-medium text-[#737873] mb-1 flex items-center gap-1.5"
+                  >
+                    <Calendar className="h-3.5 w-3.5 text-[#5B7083]" />
+                    <span>Date de début :</span>
+                  </label>
+                  <input
+                    id="report-date-debut"
+                    type="date"
+                    value={dateDebut}
+                    onChange={(e) => setDateDebut(e.target.value)}
+                    className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3 py-2 text-xs font-normal text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="report-date-fin"
+                    className="block text-xs font-medium text-[#737873] mb-1 flex items-center gap-1.5"
+                  >
+                    <Calendar className="h-3.5 w-3.5 text-[#5B7083]" />
+                    <span>Date de fin :</span>
+                  </label>
+                  <input
+                    id="report-date-fin"
+                    type="date"
+                    value={dateFin}
+                    onChange={(e) => setDateFin(e.target.value)}
+                    className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3 py-2 text-xs font-normal text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Raccourcis de période */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[10px] font-semibold text-[#737873] uppercase tracking-wider mr-1">
+                  Période :
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQuickPreset('currentWeek')}
+                  className="rounded-lg border border-[#F0EFEB] bg-white px-2 py-1 text-[10px] font-medium text-[#737873] hover:border-[#6B8E78]/40 hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
+                >
+                  Semaine
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickPreset('last7days')}
+                  className="rounded-lg border border-[#F0EFEB] bg-white px-2 py-1 text-[10px] font-medium text-[#737873] hover:border-[#6B8E78]/40 hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
+                >
+                  7j
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickPreset('currentMonth')}
+                  className="rounded-lg border border-[#F0EFEB] bg-white px-2 py-1 text-[10px] font-medium text-[#737873] hover:border-[#6B8E78]/40 hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
+                >
+                  Mois
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickPreset('today')}
+                  className="rounded-lg border border-[#F0EFEB] bg-white px-2 py-1 text-[10px] font-medium text-[#737873] hover:border-[#6B8E78]/40 hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
+                >
+                  Auj.
+                </button>
+              </div>
             </div>
 
-            <div>
-              <label
-                htmlFor="report-date-fin"
-                className="block text-xs font-medium text-[#737873] mb-1 flex items-center gap-1.5"
-              >
-                <Calendar className="h-3.5 w-3.5 text-[#5B7083]" />
-                <span>Date de fin :</span>
-              </label>
-              <input
-                id="report-date-fin"
-                type="date"
-                value={dateFin}
-                onChange={(e) => setDateFin(e.target.value)}
-                className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3 py-2 text-xs font-normal text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
-              />
+            {/* Colonne 2 : Périmètre et Destinataire */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Périmètre */}
+              <div>
+                <label
+                  htmlFor="report-perimetre"
+                  className="block text-xs font-medium text-[#737873] mb-1 flex items-center gap-1.5"
+                >
+                  <Layers className="h-3.5 w-3.5 text-[#5B7083]" />
+                  <span>Périmètre :</span>
+                </label>
+                <select
+                  id="report-perimetre"
+                  value={perimetre}
+                  onChange={(e) => {
+                    const val = e.target.value as 'tous' | 'projet';
+                    setPerimetre(val);
+                    if (val === 'tous') {
+                      setProjetSelectionneId('');
+                    } else if (spaceProjects.length > 0 && !projetSelectionneId) {
+                      setProjetSelectionneId(spaceProjects[0].id);
+                    }
+                  }}
+                  className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3 py-2 text-xs font-normal text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
+                >
+                  <option value="tous">Tous les projets</option>
+                  <option value="projet">Un projet spécifique</option>
+                </select>
+
+                {/* Dropdown dynamique du projet spécifique */}
+                {perimetre === 'projet' && (
+                  <div className="mt-1.5 animate-in slide-in-from-top-1 duration-150">
+                    <select
+                      id="report-projet-specific"
+                      value={projetSelectionneId}
+                      onChange={(e) => setProjetSelectionneId(e.target.value)}
+                      className="w-full rounded-xl border border-[#6B8E78]/30 bg-white px-3 py-2 text-xs font-normal text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
+                    >
+                      {spaceProjects.length === 0 ? (
+                        <option value="">Aucun projet dans cet espace</option>
+                      ) : (
+                        spaceProjects.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.nom}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Destinataire / Cible */}
+              <div>
+                <label
+                  htmlFor="report-cible"
+                  className="block text-xs font-medium text-[#737873] mb-1 flex items-center gap-1.5"
+                >
+                  <Users className="h-3.5 w-3.5 text-[#5B7083]" />
+                  <span>Destinataire :</span>
+                </label>
+                <select
+                  id="report-cible"
+                  value={cible}
+                  onChange={(e) => setCible(e.target.value as 'n1' | 'codir')}
+                  className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3 py-2 text-xs font-normal text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
+                >
+                  <option value="n1">Responsable direct (N+1)</option>
+                  <option value="codir">Comité de Direction / CODIR</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          {/* Raccourcis de période et statut des données */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] font-medium text-[#737873] mr-1">
-                Raccourcis :
-              </span>
-              <button
-                type="button"
-                onClick={() => setQuickPreset('currentWeek')}
-                className="rounded-lg border border-[#F0EFEB] bg-white px-2.5 py-1 text-[11px] font-medium text-[#737873] hover:border-[#6B8E78]/40 hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
-              >
-                Semaine en cours (défaut)
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickPreset('last7days')}
-                className="rounded-lg border border-[#F0EFEB] bg-white px-2.5 py-1 text-[11px] font-medium text-[#737873] hover:border-[#6B8E78]/40 hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
-              >
-                7 derniers jours
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickPreset('currentMonth')}
-                className="rounded-lg border border-[#F0EFEB] bg-white px-2.5 py-1 text-[11px] font-medium text-[#737873] hover:border-[#6B8E78]/40 hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
-              >
-                Ce mois-ci
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickPreset('today')}
-                className="rounded-lg border border-[#F0EFEB] bg-white px-2.5 py-1 text-[11px] font-medium text-[#737873] hover:border-[#6B8E78]/40 hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
-              >
-                Aujourd&apos;hui
-              </button>
-            </div>
-
-            {/* Compteur d'activités trouvées */}
+          {/* Bouton principal de génération et compteurs */}
+          <div className="pt-2 border-t border-[#F0EFEB]/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Badge de tâches correspondantes */}
             <div className="flex items-center gap-2 text-xs font-medium">
               <span
                 id="report-matching-count-badge"
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] ${
                   matchingTasks.length > 0
                     ? 'bg-[#6B8E78]/10 text-[#4e634a] border-[#6B8E78]/25'
                     : 'bg-[#C89B7B]/10 text-[#966847] border-[#C89B7B]/25'
@@ -337,19 +441,10 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
               >
                 <Layers className="h-3.5 w-3.5" />
                 <span>
-                  <strong>{matchingTasks.length}</strong> tâche{matchingTasks.length > 1 ? 's' : ''} (
-                  {uniqueProjectsCount} projet{uniqueProjectsCount > 1 ? 's' : ''})
+                  <strong>{matchingTasks.length}</strong> tâche{matchingTasks.length > 1 ? 's' : ''} active
+                  {matchingTasks.length > 1 ? 's' : ''} ({uniqueProjectsCount} projet
+                  {uniqueProjectsCount > 1 ? 's' : ''})
                 </span>
-              </span>
-            </div>
-          </div>
-
-          {/* Bouton principal de génération */}
-          <div className="pt-1 flex items-center justify-between gap-3">
-            <div className="text-[11px] text-[#737873] hidden sm:flex items-center gap-1">
-              <Clock className="h-3 w-3 text-[#737873]/70" />
-              <span>
-                Période : {formatFrenchDateDisplay(dateDebut)} au {formatFrenchDateDisplay(dateFin)}
               </span>
             </div>
 
@@ -358,7 +453,7 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
               type="button"
               onClick={handleGenerate}
               disabled={isLoading || matchingTasks.length === 0}
-              className="ml-auto inline-flex items-center gap-2 rounded-xl bg-[#6B8E78] px-5 py-2.5 text-xs font-medium text-white hover:bg-[#5d7c68] disabled:bg-[#F0EFEB] disabled:text-[#737873]/50 disabled:cursor-not-allowed transition-all active:scale-[0.99] shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#6B8E78] px-5 py-2.5 text-xs font-medium text-white hover:bg-[#5d7c68] disabled:bg-[#F0EFEB] disabled:text-[#737873]/50 disabled:cursor-not-allowed transition-all active:scale-[0.99] shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
             >
               {isLoading ? (
                 <>
@@ -418,8 +513,17 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
                   L&apos;IA Gemini analyse vos activités...
                 </h4>
                 <p className="text-xs text-[#737873] leading-relaxed">
-                  Regroupement strict par projet, synthèse de l&apos;avancement et formulation
-                  d&apos;un compte-rendu serein destiné à votre responsable hiérarchique.
+                  {cible === 'codir' ? (
+                    <>
+                      Synthèse stratégique Executive Summary de haut niveau. Regroupement par projet et focus
+                      sur les jalons franchis, la météo et l&apos;analyse des risques majeurs pour le CODIR.
+                    </>
+                  ) : (
+                    <>
+                      Regroupement strict par projet, synthèse de l&apos;avancement et formulation d&apos;un
+                      compte-rendu serein et constructif destiné à votre responsable direct (N+1).
+                    </>
+                  )}
                 </p>
               </div>
             </div>
@@ -440,12 +544,12 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
                     <>
                       <strong>{matchingTasks.length} tâche(s)</strong> actives ou modifiées identifiées
                       sur cette période. Cliquez sur <strong>« Générer le rapport IA »</strong> pour
-                      obtenir une synthèse structurée par projet.
+                      obtenir une synthèse structurée pour votre <strong>{cible === 'n1' ? 'responsable direct (N+1)' : 'Comité de Direction (CODIR)'}</strong>.
                     </>
                   ) : (
                     <>
-                      Aucune activité enregistrée sur cette période dans cet espace.
-                      Ajustez les dates ci-dessus ou choisissez un autre raccourci.
+                      Aucune activité enregistrée sur cette période pour le périmètre sélectionné.
+                      Ajustez les dates ou changez de projet ci-dessus.
                     </>
                   )}
                 </p>
@@ -552,7 +656,7 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
           <div className="flex items-center gap-2">
             <Send className="h-3.5 w-3.5 text-[#5B7083]" />
             <span className="hidden sm:inline font-light">
-              Rapport synthétique prêt pour communication avec votre responsable.
+              Rapport personnalisé et optimisé prêt pour vos échanges.
             </span>
           </div>
 
