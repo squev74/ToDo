@@ -94,6 +94,15 @@ export async function fetchMonthTimeEntries(
 }
 
 /**
+ * Génère un identifiant de document sûr pour Firestore, en évitant les slashs
+ * qui créent des segments de chemin invalides.
+ */
+function getSafeDocId(date: string, jiraKey: string): string {
+  const safeJiraKey = jiraKey.replace(/\//g, '__');
+  return `${date}_${safeJiraKey}`;
+}
+
+/**
  * Enregistre ou met à jour une saisie de temps dans Firestore.
  * Clé unique : YYYY-MM-DD_jiraKey (ex: 2026-09-18_EVOLIT-24)
  */
@@ -109,7 +118,7 @@ export async function saveTimeEntry(
     taskId?: string;
   }
 ): Promise<void> {
-  const docId = `${entry.date}_${entry.jiraKey}`;
+  const docId = getSafeDocId(entry.date, entry.jiraKey);
   const path = `users/${userId}/timeEntries/${docId}`;
   
   try {
@@ -159,7 +168,7 @@ export async function saveMultipleTimeEntries(
     const batch = writeBatch(db);
     
     for (const entry of entries) {
-      const docId = `${entry.date}_${entry.jiraKey}`;
+      const docId = getSafeDocId(entry.date, entry.jiraKey);
       const docRef = doc(db, 'users', userId, 'timeEntries', docId);
       
       if (entry.hours <= 0) {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Trash2, Folder, Check, Edit2 } from 'lucide-react';
+import { X, Plus, Trash2, Folder, Check, Edit2, Eye } from 'lucide-react';
 import { Projet, Tache, Espace } from '../types';
 import { getWorkspaceIconComponent } from '../utils/workspaceIcons';
 
@@ -12,6 +12,7 @@ interface ProjectManagerModalProps {
   onUpdateProject: (id: string, nom: string, couleur: string, jiraKey?: string) => void;
   onRequestDeleteProject: (projet: Projet) => void;
   onClose: () => void;
+  onOpenProjectDetail?: (project: Projet) => void;
 }
 
 const PRESET_COLORS = [
@@ -36,6 +37,7 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
   onUpdateProject,
   onRequestDeleteProject,
   onClose,
+  onOpenProjectDetail,
 }) => {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectJira, setNewProjectJira] = useState('');
@@ -327,6 +329,21 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1">
+                      {onOpenProjectDetail && (
+                        <button
+                          id={`detail-project-btn-${proj.id}`}
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            onOpenProjectDetail(proj);
+                          }}
+                          className="flex items-center gap-1.5 rounded-lg border border-[#6B8E78]/20 bg-[#6B8E78]/5 px-2.5 py-1 text-[11px] font-medium text-[#5D7C68] hover:bg-[#6B8E78]/15 hover:border-[#6B8E78]/40 transition-colors cursor-pointer"
+                          title="Fiche détaillée, Livrables & Liens utiles"
+                        >
+                          <Eye className="h-3 w-3" />
+                          <span>Détails</span>
+                        </button>
+                      )}
                       <button
                         id={`edit-project-btn-${proj.id}`}
                         type="button"

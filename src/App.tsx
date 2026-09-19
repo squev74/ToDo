@@ -18,7 +18,7 @@ import {
   Zap,
   Shield,
 } from 'lucide-react';
-import { Tache, Projet, Espace, StatutTache } from './types';
+import { Tache, Projet, Espace, StatutTache, ProjectDeliverable } from './types';
 import {
   DEFAULT_SPACE_ID,
   getDefaultSpaces,
@@ -67,6 +67,7 @@ import { TaskItem } from './components/TaskItem';
 import { TaskFormModal } from './components/TaskFormModal';
 import { BlockedReasonModal } from './components/BlockedReasonModal';
 import { ProjectManagerModal } from './components/ProjectManagerModal';
+import { ProjectDetailView } from './components/ProjectDetailView';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { DailyReportPanel } from './components/DailyReportPanel';
 import { ActivityReportModal } from './components/ActivityReportModal';
@@ -131,6 +132,7 @@ export default function App() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Tache | null>(null);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [selectedProjectDetail, setSelectedProjectDetail] = useState<Projet | null>(null);
 
   // Modale Tâches récurrentes planifiées (inspiration Outlook)
   const [recurringTemplates, setRecurringTemplates] = useState<RecurringTaskTemplate[]>([]);
@@ -1017,7 +1019,13 @@ export default function App() {
   };
 
   // Projets : Mise à jour dans l'espace actif
-  const handleUpdateProject = (projectId: string, nom: string, couleur: string, jiraKey?: string) => {
+  const handleUpdateProject = (
+    projectId: string, 
+    nom: string, 
+    couleur: string, 
+    jiraKey?: string, 
+    deliverables?: ProjectDeliverable[]
+  ) => {
     const updatedProj = projects.find((p) => p.id === projectId);
     if (!updatedProj) return;
 
@@ -1026,11 +1034,16 @@ export default function App() {
       nom,
       couleur,
       jiraKey,
+      deliverables: deliverables !== undefined ? deliverables : updatedProj.deliverables,
     };
 
     setProjects((prev) =>
       prev.map((p) => (p.id === projectId ? newProj : p))
     );
+
+    if (selectedProjectDetail && selectedProjectDetail.id === projectId) {
+      setSelectedProjectDetail(newProj);
+    }
 
     // Mettre à jour les tâches associées pour garder la clé JIRA synchronisée
     setTasks((prev) =>
@@ -1555,6 +1568,16 @@ export default function App() {
         onUpdateProject={handleUpdateProject}
         onRequestDeleteProject={handleRequestDeleteProject}
         onClose={() => setIsProjectModalOpen(false)}
+        onOpenProjectDetail={(proj) => setSelectedProjectDetail(proj)}
+      />
+
+      {/* FICHE DÉTAILLÉE DU PROJET AVEC GESTION DES LIVRABLES (Style Japandi) */}
+      <ProjectDetailView
+        isOpen={selectedProjectDetail !== null}
+        project={selectedProjectDetail}
+        tasks={tasks}
+        onClose={() => setSelectedProjectDetail(null)}
+        onUpdateProject={handleUpdateProject}
       />
 
       {/* MODALE GESTION DES ESPACES DE TRAVAIL (CRUD WORKSPACES) */}

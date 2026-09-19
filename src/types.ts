@@ -52,6 +52,9 @@ export interface Tache {
   commentaires: Commentaire[];
 }
 
+import { ProjectDeliverable, Project } from './types/project';
+export type { ProjectDeliverable, Project };
+
 export type Task = Tache;
 
 export interface Projet {
@@ -62,6 +65,7 @@ export interface Projet {
   couleur: string; // Code couleur hex ou classe Tailwind
   dateCreation: string;
   jiraKey?: string; // Clé JIRA ou code unique du projet (ex: EVOLIT-24)
+  deliverables?: ProjectDeliverable[];
 }
 
 export interface AppDataExport {

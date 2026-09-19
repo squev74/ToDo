@@ -177,7 +177,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
 
   // Ajouter la ligne fixe des absences "Vacances / Congés / Maladie" à la fin
   const projectsToRender = useMemo(() => {
-    return [...activeProjects, ABSENCE_PROJECT];
+    return [ABSENCE_PROJECT,...activeProjects];
   }, [activeProjects]);
 
   // Structurer les heures loggées sous forme de dictionnaire pour un accès ultra-rapide
