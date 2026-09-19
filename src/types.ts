@@ -52,8 +52,9 @@ export interface Tache {
   commentaires: Commentaire[];
 }
 
-import { ProjectDeliverable, Project } from './types/project';
-export type { ProjectDeliverable, Project };
+import { ProjectDeliverable, Project, TeamMember, MonthlyAllocation } from './types/project';
+import { RaidItem, RaidType, ImpactLevel, ProbabilityLevel, RoamStatus } from './types/raid';
+export type { ProjectDeliverable, Project, TeamMember, MonthlyAllocation, RaidItem, RaidType, ImpactLevel, ProbabilityLevel, RoamStatus };
 
 export type Task = Tache;
 
@@ -66,6 +67,9 @@ export interface Projet {
   dateCreation: string;
   jiraKey?: string; // Clé JIRA ou code unique du projet (ex: EVOLIT-24)
   deliverables?: ProjectDeliverable[];
+  teamMembers?: TeamMember[];
+  allocations?: MonthlyAllocation[];
+  raidLog?: RaidItem[];
 }
 
 export interface AppDataExport {

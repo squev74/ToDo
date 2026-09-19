@@ -206,6 +206,40 @@ export function compressAndLightenTasks(tasks: PreparedTaskReportItem[]): any[] 
 }
 
 /**
+ * Extrait et compresse les éléments RAID prioritaires (criticité >= 6 ou 'issue' ouvert)
+ * pour enrichir le prompt de l'IA sans alourdir le coût en tokens.
+ */
+export function extractAndCompressRaidLog(projects: Projet[], projetIdSelectionne?: string): any[] {
+  const compressed: any[] = [];
+  
+  projects.forEach((proj) => {
+    // Si filtré par projet, ignorer les autres
+    if (projetIdSelectionne && proj.id !== projetIdSelectionne) return;
+    
+    const log = proj.raidLog || [];
+    log.forEach((item) => {
+      // Filtrer : score >= 6 (Risques élevés) OU statut 'issue' et ouvert
+      const isHighCriticality = item.criticalityScore >= 6;
+      const isOpenIssue = item.type === 'issue' && item.status === 'open';
+      
+      if (item.status === 'open' && (isHighCriticality || isOpenIssue)) {
+        compressed.push({
+          title: item.title,
+          type: item.type,
+          score: item.criticalityScore,
+          roam: item.roamStatus,
+          owner: item.owner || undefined,
+          mitigation: item.mitigationPlan || undefined,
+          project: proj.nom
+        });
+      }
+    });
+  });
+  
+  return compressed;
+}
+
+/**
  * Formate une date YYYY-MM-DD en français lisible (ex: 14 septembre 2026)
  */
 export function formatFrenchDateDisplay(dateStr: string): string {
@@ -338,6 +372,12 @@ RÈGLES DE RÉDACTION :
   // Compression des tâches pour optimiser les coûts et le volume de tokens
   const lightenedTasks = compressAndLightenTasks(preparedTasks);
 
+  // Extraction et compression du RAID Log
+  const compressedRaidItems = extractAndCompressRaidLog(
+    projects, 
+    perimetre === 'projet' ? projetSelectionneId : undefined
+  );
+
   const legendInfo = `LÉGENDE DES DONNÉES COMPRESSÉES :
 - title = Titre de la tâche
 - status = Statut (done=Réalisé, in_progress=En cours, blocked=Bloqué, open=À faire, backlog=Backlog)
@@ -347,7 +387,13 @@ RÈGLES DE RÉDACTION :
 - completed = Date de réalisation
 - notes = Liste de commentaires ou suivis récents`;
 
-  const userPrompt = `${legendInfo}\n\nVoici les données d'activité compressées et allégées des ${preparedTasks.length} tâches actives sur la période :\n\n${JSON.stringify(lightenedTasks, null, 2)}\n\nRédige le compte-rendu professionnel adapté maintenant.`;
+  let userPrompt = `${legendInfo}\n\nVoici les données d'activité compressées et allégées des ${preparedTasks.length} tâches actives sur la période :\n\n${JSON.stringify(lightenedTasks, null, 2)}\n\n`;
+
+  if (compressedRaidItems.length > 0) {
+    userPrompt += `Voici également les ÉLÉMENTS DE RISQUE MAJEURS & PROBLÈMES CRITIQUES (RAID Log) actifs pour ce périmètre (score de criticité >= 6 ou statut 'issue' ouvert) :\n\n${JSON.stringify(compressedRaidItems, null, 2)}\n\nIMPORTANT : Utilise impérativement ces données de risque/problèmes pour enrichir la section "Points d'attention" ou "ANALYSE DES RISQUES ET IMPACTS MAJEURS" du rapport, en intégrant leur impact et le plan de mitigation proposé.\n\n`;
+  }
+
+  userPrompt += `Rédige le compte-rendu professionnel adapté maintenant.`;
 
   // 4. Appel de l'API Gemini avec modèle performant Flash et fallback
   const modelsToTry = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash'];

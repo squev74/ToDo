@@ -11,8 +11,10 @@ import {
   ChevronRight, 
   KanbanSquare 
 } from 'lucide-react';
-import { Projet, Tache, ProjectDeliverable } from '../types';
+import { Projet, Tache, ProjectDeliverable, TeamMember, MonthlyAllocation, RaidItem } from '../types';
 import { ProjectDeliverablesSection } from './ProjectDeliverablesSection';
+import { ProjectMonthlyCapacity } from './ProjectMonthlyCapacity';
+import { ProjectRaidLogSection } from './ProjectRaidLogSection';
 
 interface ProjectDetailViewProps {
   isOpen: boolean;
@@ -24,11 +26,14 @@ interface ProjectDetailViewProps {
     nom: string, 
     couleur: string, 
     jiraKey?: string, 
-    deliverables?: ProjectDeliverable[]
+    deliverables?: ProjectDeliverable[],
+    teamMembers?: TeamMember[],
+    allocations?: MonthlyAllocation[],
+    raidLog?: RaidItem[]
   ) => void;
 }
 
-type TabType = 'overview' | 'deliverables';
+type TabType = 'overview' | 'deliverables' | 'capacity' | 'raid';
 
 const STATUS_LABELS: Record<string, string> = {
   Backlog: 'Backlog',
@@ -101,7 +106,35 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
       project.nom,
       project.couleur,
       project.jiraKey,
-      updatedDeliverables
+      updatedDeliverables,
+      project.teamMembers,
+      project.allocations
+    );
+  };
+
+  const handleUpdateCapacity = (updatedMembers: TeamMember[], updatedAllocations: MonthlyAllocation[]) => {
+    onUpdateProject(
+      project.id,
+      project.nom,
+      project.couleur,
+      project.jiraKey,
+      project.deliverables,
+      updatedMembers,
+      updatedAllocations,
+      project.raidLog
+    );
+  };
+
+  const handleUpdateRaid = (updatedRaidLog: RaidItem[]) => {
+    onUpdateProject(
+      project.id,
+      project.nom,
+      project.couleur,
+      project.jiraKey,
+      project.deliverables,
+      project.teamMembers,
+      project.allocations,
+      updatedRaidLog
     );
   };
 
@@ -121,7 +154,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
     >
       <div
         id="project-detail-sidebar"
-        className="h-full w-full max-w-xl bg-white shadow-[[-10px_0_30px_rgba(0,0,0,0.03)]] border-l border-[#F0EFEB] flex flex-col animate-in slide-in-from-right duration-300"
+        className={`h-full w-full ${(activeTab === 'capacity' || activeTab === 'raid') ? 'max-w-4xl' : 'max-w-xl'} bg-white shadow-[[-10px_0_30px_rgba(0,0,0,0.03)]] border-l border-[#F0EFEB] flex flex-col transition-all duration-300 animate-in slide-in-from-right`}
       >
         {/* EN-TÊTE DE LA FICHE */}
         <div className="p-6 border-b border-[#F0EFEB] space-y-4">
@@ -187,12 +220,44 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                 </span>
               )}
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('capacity')}
+              className={`ml-6 pb-2.5 px-1 text-xs font-medium border-b-2 transition-all relative ${
+                activeTab === 'capacity'
+                  ? 'border-[#6B8E78] text-[#5D7C68] font-semibold'
+                  : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
+              }`}
+            >
+              Capacité & Planification
+              {project.teamMembers && project.teamMembers.length > 0 && (
+                <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#6B8E78]/10 text-[#5D7C68] text-[9px] font-bold">
+                  {project.teamMembers.length}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('raid')}
+              className={`ml-6 pb-2.5 px-1 text-xs font-medium border-b-2 transition-all relative ${
+                activeTab === 'raid'
+                  ? 'border-[#6B8E78] text-[#5D7C68] font-semibold'
+                  : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
+              }`}
+            >
+              Registre RAID & ROAM
+              {project.raidLog && project.raidLog.filter(item => item.status === 'open').length > 0 && (
+                <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-[9px] font-bold">
+                  {project.raidLog.filter(item => item.status === 'open').length}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
         {/* CONTENU DE L'ONGLET */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {activeTab === 'overview' ? (
+          {activeTab === 'overview' && (
             <div className="space-y-6">
               {/* Carte de Progression */}
               <div className="rounded-2xl border border-[#F0EFEB] bg-white p-4 space-y-3.5">
@@ -289,10 +354,26 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                 )}
               </div>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'deliverables' && (
             <ProjectDeliverablesSection 
               project={project} 
               onUpdateDeliverables={handleUpdateDeliverables} 
+            />
+          )}
+
+          {activeTab === 'capacity' && (
+            <ProjectMonthlyCapacity 
+              project={project}
+              onUpdateProjectCapacity={handleUpdateCapacity}
+            />
+          )}
+
+          {activeTab === 'raid' && (
+            <ProjectRaidLogSection 
+              project={project}
+              onUpdateRaidLog={handleUpdateRaid}
             />
           )}
         </div>

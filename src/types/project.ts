@@ -1,3 +1,5 @@
+import { RaidItem } from './raid';
+
 export interface ProjectDeliverable {
   id: string;
   title: string;
@@ -5,6 +7,21 @@ export interface ProjectDeliverable {
   type: 'planning' | 'doc' | 'report' | 'design' | 'other';
   status: 'planned' | 'in_progress' | 'delivered';
   deliveredAt?: string; // Format ISO ou date string
+}
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  email?: string;
+}
+
+export interface MonthlyAllocation {
+  memberId: string;
+  year: number;
+  month: number; // 1 to 12
+  requestedDays: number;
+  status: 'draft' | 'requested' | 'approved' | 'rejected';
 }
 
 export interface Projet {
@@ -16,6 +33,9 @@ export interface Projet {
   dateCreation: string;
   jiraKey?: string; // Clé JIRA ou code unique du projet (ex: EVOLIT-24)
   deliverables?: ProjectDeliverable[];
+  teamMembers?: TeamMember[];
+  allocations?: MonthlyAllocation[];
+  raidLog?: RaidItem[];
 }
 
 export type Project = Projet;

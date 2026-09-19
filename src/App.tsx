@@ -18,7 +18,7 @@ import {
   Zap,
   Shield,
 } from 'lucide-react';
-import { Tache, Projet, Espace, StatutTache, ProjectDeliverable } from './types';
+import { Tache, Projet, Espace, StatutTache, ProjectDeliverable, TeamMember, MonthlyAllocation, RaidItem } from './types';
 import {
   DEFAULT_SPACE_ID,
   getDefaultSpaces,
@@ -1024,7 +1024,10 @@ export default function App() {
     nom: string, 
     couleur: string, 
     jiraKey?: string, 
-    deliverables?: ProjectDeliverable[]
+    deliverables?: ProjectDeliverable[],
+    teamMembers?: TeamMember[],
+    allocations?: MonthlyAllocation[],
+    raidLog?: RaidItem[]
   ) => {
     const updatedProj = projects.find((p) => p.id === projectId);
     if (!updatedProj) return;
@@ -1035,6 +1038,9 @@ export default function App() {
       couleur,
       jiraKey,
       deliverables: deliverables !== undefined ? deliverables : updatedProj.deliverables,
+      teamMembers: teamMembers !== undefined ? teamMembers : updatedProj.teamMembers,
+      allocations: allocations !== undefined ? allocations : updatedProj.allocations,
+      raidLog: raidLog !== undefined ? raidLog : updatedProj.raidLog,
     };
 
     setProjects((prev) =>
