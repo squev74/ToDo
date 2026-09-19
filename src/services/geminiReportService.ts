@@ -1,4 +1,5 @@
 import { Tache, Projet } from '../types';
+import { scrubSensitiveEntities, sanitizeUserIdentity } from '../utils/aiSanitizer';
 
 export interface PreparedTaskReportItem {
   id: string;
@@ -172,18 +173,19 @@ export function extractAndPrepareTasks({
 export function compressAndLightenTasks(tasks: PreparedTaskReportItem[]): any[] {
   return tasks.map((t) => {
     const cleanItem: Record<string, any> = {
-      title: t.titre,
+      title: scrubSensitiveEntities(t.titre),
       status: t.statut,
     };
 
     if (t.projet && t.projet !== 'Général / Sans projet') {
-      cleanItem.project = t.projet;
+      cleanItem.project = scrubSensitiveEntities(t.projet);
     }
 
     if (t.description && t.description.trim()) {
       const desc = t.description.trim();
       // On tronque la description à 120 caractères max pour alléger drastiquement
-      cleanItem.desc = desc.length > 120 ? desc.substring(0, 117) + '...' : desc;
+      const truncated = desc.length > 120 ? desc.substring(0, 117) + '...' : desc;
+      cleanItem.desc = scrubSensitiveEntities(truncated);
     }
 
     if (t.dateEcheance) {
@@ -196,9 +198,10 @@ export function compressAndLightenTasks(tasks: PreparedTaskReportItem[]): any[] 
 
     if (t.commentairesRecents && t.commentairesRecents.length > 0) {
       // On ne garde que l'essentiel des notes récentes
-      cleanItem.notes = t.commentairesRecents.map((c) =>
-        c.length > 80 ? c.substring(0, 77) + '...' : c
-      );
+      cleanItem.notes = t.commentairesRecents.map((c) => {
+        const truncatedComment = c.length > 80 ? c.substring(0, 77) + '...' : c;
+        return scrubSensitiveEntities(truncatedComment);
+      });
     }
 
     return cleanItem;
@@ -224,13 +227,13 @@ export function extractAndCompressRaidLog(projects: Projet[], projetIdSelectionn
       
       if (item.status === 'open' && (isHighCriticality || isOpenIssue)) {
         compressed.push({
-          title: item.title,
+          title: scrubSensitiveEntities(item.title),
           type: item.type,
           score: item.criticalityScore,
           roam: item.roamStatus,
-          owner: item.owner || undefined,
-          mitigation: item.mitigationPlan || undefined,
-          project: proj.nom
+          owner: item.owner ? sanitizeUserIdentity(item.owner) : undefined,
+          mitigation: item.mitigationPlan ? scrubSensitiveEntities(item.mitigationPlan) : undefined,
+          project: scrubSensitiveEntities(proj.nom)
         });
       }
     });

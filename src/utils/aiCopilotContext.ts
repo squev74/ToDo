@@ -1,4 +1,9 @@
 import { Tache, Projet, KnowledgeDoc, RaidItem } from '../types';
+import { 
+  sanitizeTaskForAi, 
+  sanitizeRaidItemForAi, 
+  scrubSensitiveEntities 
+} from './aiSanitizer';
 
 /**
  * Filtre et renvoie les tâches en retard par rapport à la date du jour (YYYY-MM-DD).
@@ -63,30 +68,37 @@ export function getSopSummaries(): { title: string; category: string; summary: s
 /**
  * Compresse et construit un contexte textuel minimaliste (Japandi Style - Light JSON)
  * pour nourrir l'assistant Gemini à chaque question en réduisant drastiquement les tokens.
+ * Toutes les données sont rigoureusement anonymisées et désinfectées (RGPD, Confidentialité Client).
  */
 export function buildCopilotContext(tasks: Tache[], projects: Projet[], spaceId: string): string {
   const overdue = getOverdueTasks(tasks, spaceId);
   const criticalRisks = getCriticalRisks(projects, spaceId);
   const sops = getSopSummaries();
 
-  // Allègement maximal : structure ultra-condensée
+  // Allègement maximal : structure ultra-condensée et anonymisée
   const contextData = {
     date: new Date().toLocaleDateString('fr-FR'),
-    overdue_tasks: overdue.map((t) => ({
-      id: t.id,
-      title: t.titre,
-      due: t.dateEcheance,
-      status: t.statut,
-    })),
-    critical_risks: criticalRisks.map(({ projectTitle, risk }) => ({
-      proj: projectTitle,
-      title: risk.title,
-      score: risk.criticalityScore,
-      mitigation: risk.mitigationPlan || "Non défini",
-    })),
+    overdue_tasks: overdue.map((t) => {
+      const s = sanitizeTaskForAi(t);
+      return {
+        id: s.id,
+        title: s.originalTitleTruncated,
+        due: s.dateEcheance,
+        status: s.statut,
+      };
+    }),
+    critical_risks: criticalRisks.map(({ projectTitle, risk }) => {
+      const r = sanitizeRaidItemForAi(risk);
+      return {
+        proj: scrubSensitiveEntities(projectTitle),
+        title: r.cleanTitle,
+        score: r.criticalityScore,
+        mitigation: r.cleanDescription ? r.cleanDescription : "Non défini",
+      };
+    }),
     knowledge_sops: sops.map((s) => ({
-      title: s.title,
-      summary: s.summary,
+      title: scrubSensitiveEntities(s.title),
+      summary: scrubSensitiveEntities(s.summary),
     })),
   };
 
