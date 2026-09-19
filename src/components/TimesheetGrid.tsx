@@ -17,6 +17,7 @@ import {
   saveTimeEntry,
   fetchTimesheetConfig,
   saveTimesheetConfig,
+  getSafeDocId,
 } from '../services/timesheetService';
 import {
   TimeEntry,
@@ -352,7 +353,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
 
   // Modifier les heures à la volée
   const handleHoursChange = async (dateStr: string, jiraKey: string, projectName: string, valueStr: string) => {
-    const hours = parseFloat(valueStr);
+    const hours = valueStr === '' ? 0 : parseFloat(valueStr);
     const cellKey = `${dateStr}_${jiraKey}`;
 
     if (isNaN(hours) || hours < 0) return;
@@ -374,7 +375,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
       });
 
       setEntries((prev) => {
-        const docId = `${dateStr}_${jiraKey}`;
+        const docId = getSafeDocId(dateStr, jiraKey);
         const filtered = prev.filter((e) => e.id !== docId);
         if (hours <= 0) return filtered;
 
@@ -433,7 +434,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
       });
 
       setEntries((prev) => {
-        const docId = `${date}_${jiraKey}`;
+        const docId = getSafeDocId(date, jiraKey);
         const filtered = prev.filter((e) => e.id !== docId);
         if (hours <= 0 && !comment.trim()) return filtered;
 

@@ -97,7 +97,7 @@ export async function fetchMonthTimeEntries(
  * Génère un identifiant de document sûr pour Firestore, en évitant les slashs
  * qui créent des segments de chemin invalides.
  */
-function getSafeDocId(date: string, jiraKey: string): string {
+export function getSafeDocId(date: string, jiraKey: string): string {
   const safeJiraKey = jiraKey.replace(/\//g, '__');
   return `${date}_${safeJiraKey}`;
 }

@@ -9,7 +9,8 @@ import {
   TrendingUp, 
   AlertCircle, 
   ChevronRight, 
-  KanbanSquare 
+  KanbanSquare,
+  ArrowLeft
 } from 'lucide-react';
 import { Projet, Tache, ProjectDeliverable, TeamMember, MonthlyAllocation, RaidItem } from '../types';
 import { ProjectDeliverablesSection } from './ProjectDeliverablesSection';
@@ -146,117 +147,123 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
 
   return (
     <div
-      id="project-detail-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-end bg-[#1A1D1A]/20 backdrop-blur-xs transition-opacity duration-300"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+      id="project-detail-fullscreen-overlay"
+      className="fixed inset-0 z-50 bg-[#FAF9F6] flex flex-col h-screen w-screen overflow-hidden animate-in fade-in duration-200"
     >
-      <div
-        id="project-detail-sidebar"
-        className={`h-full w-full ${(activeTab === 'capacity' || activeTab === 'raid') ? 'max-w-4xl' : 'max-w-xl'} bg-white shadow-[[-10px_0_30px_rgba(0,0,0,0.03)]] border-l border-[#F0EFEB] flex flex-col transition-all duration-300 animate-in slide-in-from-right`}
-      >
-        {/* EN-TÊTE DE LA FICHE */}
-        <div className="p-6 border-b border-[#F0EFEB] space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span
-                className="h-4.5 w-4.5 rounded-full"
-                style={{ backgroundColor: project.couleur }}
-              />
-              <span className="text-[10px] uppercase tracking-wider font-semibold text-[#737873]">
-                Fiche détaillée du projet
+      {/* 1. EN-TÊTE SUPÉRIEURE (BREADCRUMB & TITRE RAPIDE) */}
+      <div className="bg-white border-b border-[#F0EFEB] px-6 py-4 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3 text-xs md:text-sm flex-wrap">
+          <button
+            id="btn-back-to-projects"
+            type="button"
+            onClick={onClose}
+            className="flex items-center gap-1.5 font-semibold text-[#737873] hover:text-[#1A1D1A] transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Retour aux projets</span>
+          </button>
+          
+          <span className="text-[#E2DFD8] font-light">/</span>
+          
+          <div className="flex items-center gap-2 flex-wrap">
+            {project.jiraKey && (
+              <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-lg">
+                {project.jiraKey}
               </span>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl p-1.5 text-[#737873] hover:bg-[#F9F8F6] hover:text-[#1A1D1A] transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div className="space-y-1">
-            <h2 className="text-xl font-normal tracking-tight text-[#1A1D1A] flex items-center gap-2 flex-wrap">
-              <span>{project.nom}</span>
-              {project.jiraKey && (
-                <span className="rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-0.5 text-xs font-mono">
-                  {project.jiraKey}
-                </span>
-              )}
-            </h2>
-            <p className="text-xs text-[#737873] font-light">
-              Créé le {formattedDate}
-            </p>
-          </div>
-
-          {/* SÉLECTEUR D'ONGLETS JAPANDI */}
-          <div className="flex border-b border-[#F0EFEB] pt-2">
-            <button
-              type="button"
-              onClick={() => setActiveTab('overview')}
-              className={`pb-2.5 px-1 text-xs font-medium border-b-2 transition-all relative ${
-                activeTab === 'overview'
-                  ? 'border-[#6B8E78] text-[#5D7C68] font-semibold'
-                  : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
-              }`}
-            >
-              Vue d'ensemble & Tâches
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('deliverables')}
-              className={`ml-6 pb-2.5 px-1 text-xs font-medium border-b-2 transition-all relative ${
-                activeTab === 'deliverables'
-                  ? 'border-[#6B8E78] text-[#5D7C68] font-semibold'
-                  : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
-              }`}
-            >
-              Livrables & Liens utiles
-              {project.deliverables && project.deliverables.length > 0 && (
-                <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#6B8E78]/10 text-[#5D7C68] text-[9px] font-bold">
-                  {project.deliverables.length}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('capacity')}
-              className={`ml-6 pb-2.5 px-1 text-xs font-medium border-b-2 transition-all relative ${
-                activeTab === 'capacity'
-                  ? 'border-[#6B8E78] text-[#5D7C68] font-semibold'
-                  : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
-              }`}
-            >
-              Capacité & Planification
-              {project.teamMembers && project.teamMembers.length > 0 && (
-                <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#6B8E78]/10 text-[#5D7C68] text-[9px] font-bold">
-                  {project.teamMembers.length}
-                </span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('raid')}
-              className={`ml-6 pb-2.5 px-1 text-xs font-medium border-b-2 transition-all relative ${
-                activeTab === 'raid'
-                  ? 'border-[#6B8E78] text-[#5D7C68] font-semibold'
-                  : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
-              }`}
-            >
-              Registre RAID & ROAM
-              {project.raidLog && project.raidLog.filter(item => item.status === 'open').length > 0 && (
-                <span className="ml-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-[9px] font-bold">
-                  {project.raidLog.filter(item => item.status === 'open').length}
-                </span>
-              )}
-            </button>
+            )}
+            {project.jiraKey && <span className="text-[#E2DFD8]">-</span>}
+            <span className="font-bold text-[#1A1D1A]">{project.nom}</span>
+            
+            <span className="inline-flex items-center rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-700 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
+              En cours
+            </span>
           </div>
         </div>
 
-        {/* CONTENU DE L'ONGLET */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-xl p-1.5 text-[#737873] hover:bg-[#F9F8F6] hover:text-[#1A1D1A] transition-colors shrink-0"
+        >
+          <X className="h-5 w-5" />
+        </button>
+      </div>
+
+      {/* 2. BARRE DES ONGLETS (CONFORME À LA MAQUETTE DEMANDÉE) */}
+      <div className="bg-white border-b border-[#F0EFEB] px-6 shrink-0">
+        <div className="flex pt-3 max-w-7xl mx-auto w-full">
+          <button
+            id="tab-btn-tasks"
+            type="button"
+            onClick={() => setActiveTab('overview')}
+            className={`pb-3 px-2 text-xs font-bold border-b-2 transition-all relative flex items-center gap-1.5 ${
+              activeTab === 'overview'
+                ? 'border-[#6B8E78] text-[#5D7C68]'
+                : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
+            }`}
+          >
+            <span>📋 Tâches</span>
+          </button>
+          
+          <button
+            id="tab-btn-deliverables"
+            type="button"
+            onClick={() => setActiveTab('deliverables')}
+            className={`ml-8 pb-3 px-2 text-xs font-bold border-b-2 transition-all relative flex items-center gap-1.5 ${
+              activeTab === 'deliverables'
+                ? 'border-[#6B8E78] text-[#5D7C68]'
+                : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
+            }`}
+          >
+            <span>🔗 Livrables</span>
+            {project.deliverables && project.deliverables.length > 0 && (
+              <span className="inline-flex h-4.5 min-w-4.5 px-1 items-center justify-center rounded-full bg-[#6B8E78]/10 text-[#5D7C68] text-[9px] font-bold">
+                {project.deliverables.length}
+              </span>
+            )}
+          </button>
+          
+          <button
+            id="tab-btn-capacity"
+            type="button"
+            onClick={() => setActiveTab('capacity')}
+            className={`ml-8 pb-3 px-2 text-xs font-bold border-b-2 transition-all relative flex items-center gap-1.5 ${
+              activeTab === 'capacity'
+                ? 'border-[#6B8E78] text-[#5D7C68]'
+                : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
+            }`}
+          >
+            <span>📊 Capacitaire</span>
+            {project.teamMembers && project.teamMembers.length > 0 && (
+              <span className="inline-flex h-4.5 min-w-4.5 px-1 items-center justify-center rounded-full bg-[#6B8E78]/10 text-[#5D7C68] text-[9px] font-bold">
+                {project.teamMembers.length}
+              </span>
+            )}
+          </button>
+          
+          <button
+            id="tab-btn-raid"
+            type="button"
+            onClick={() => setActiveTab('raid')}
+            className={`ml-8 pb-3 px-2 text-xs font-bold border-b-2 transition-all relative flex items-center gap-1.5 ${
+              activeTab === 'raid'
+                ? 'border-[#6B8E78] text-[#5D7C68]'
+                : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
+            }`}
+          >
+            <span>⚠️ RAID</span>
+            {project.raidLog && project.raidLog.filter(item => item.status === 'open').length > 0 && (
+              <span className="inline-flex h-4.5 min-w-4.5 px-1 items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-[9px] font-bold">
+                {project.raidLog.filter(item => item.status === 'open').length}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* 3. CONTENU ENTIÈREMENT DÉPLOYÉ SUR LA LARGEUR DE L'ÉCRAN */}
+      <div className="flex-1 overflow-y-auto bg-[#FAF9F6] w-full">
+        <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
           {activeTab === 'overview' && (
             <div className="space-y-6">
               {/* Carte de Progression */}
@@ -377,17 +384,18 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
             />
           )}
         </div>
+      </div>
 
-        {/* PIED DE PAGE */}
-        <div className="p-6 border-t border-[#F0EFEB] bg-[#FAF9F6]/50 flex justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border border-[#EAE8E2] bg-white px-4 py-2 text-xs font-medium text-[#737873] hover:text-[#1A1D1A] transition-colors"
-          >
-            Fermer la fiche
-          </button>
-        </div>
+      {/* PIED DE PAGE */}
+      <div className="p-4 border-t border-[#F0EFEB] bg-white flex justify-end shrink-0">
+        <button
+          id="btn-close-project-detail"
+          type="button"
+          onClick={onClose}
+          className="rounded-xl border border-[#EAE8E2] bg-white px-4 py-2 text-xs font-semibold text-[#737873] hover:text-[#1A1D1A] transition-colors"
+        >
+          Fermer la fiche
+        </button>
       </div>
     </div>
   );

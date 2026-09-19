@@ -437,8 +437,14 @@ RÈGLES DE RÉDACTION :
         const message = errorData?.error?.message || `Erreur HTTP ${response.status}`;
         lastErrorMsg = message;
 
-        // Si le modèle est introuvable (404), on essaye le modèle suivant dans la liste
-        if (response.status === 404) {
+        // Si le modèle est introuvable (404), interdit (403), ou si le quota est épuisé (429/exhausted/quota), on essaye le suivant
+        if (
+          response.status === 404 || 
+          response.status === 403 || 
+          response.status === 429 || 
+          message.toLowerCase().includes('exhausted') || 
+          message.toLowerCase().includes('quota')
+        ) {
           continue;
         }
 
@@ -461,10 +467,19 @@ RÈGLES DE RÉDACTION :
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       lastErrorMsg = msg;
-      // Si ce n'est pas une erreur 404 de modèle, on s'arrête
-      if (!msg.includes('404') && !msg.includes('not found')) {
-        break;
+      // Si l'erreur mentionne un quota dépassé, modèle introuvable ou refusé, on continue au modèle suivant
+      if (
+        msg.includes('404') || 
+        msg.includes('403') || 
+        msg.includes('429') || 
+        msg.toLowerCase().includes('exhausted') || 
+        msg.toLowerCase().includes('quota') || 
+        msg.includes('not found') || 
+        msg.includes('permission')
+      ) {
+        continue;
       }
+      break;
     }
   }
 

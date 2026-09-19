@@ -77,6 +77,7 @@ import { WorkspaceManagerModal } from './components/WorkspaceManagerModal';
 import { Header } from './components/Header';
 import { TaskFilterBar } from './components/TaskFilterBar';
 import { BacklogView } from './components/BacklogView';
+import { KnowledgeBaseView } from './components/KnowledgeBaseView';
 import {
   updateTaskStatus,
   updateTaskDetails,
@@ -89,6 +90,7 @@ import { TimesheetGrid } from './components/TimesheetGrid';
 import { TimesheetReportModal } from './components/TimesheetReportModal';
 import { TimeEntry } from './types/timesheet';
 import { fetchMonthTimeEntries, saveTimeEntry } from './services/timesheetService';
+import { PmoCopilotWidget } from './components/PmoCopilotWidget';
 
 export default function App() {
   const { user, loading: authLoading, logout, isAdmin, isApproved } = useAuth();
@@ -119,8 +121,8 @@ export default function App() {
     }
   };
 
-  // Navigation Vue Principale : 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin'
-  const [currentView, setCurrentView] = useState<'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin'>('tasks');
+  // Navigation Vue Principale : 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge'
+  const [currentView, setCurrentView] = useState<'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge'>('tasks');
   const [taskModalDefaultStatus, setTaskModalDefaultStatus] = useState<StatutTache>('Open');
 
   // Filtres et Recherche Multi-Sélection (null = tous visibles / aucun filtre appliqué, [] = aucun sélectionné)
@@ -1505,6 +1507,8 @@ export default function App() {
             }}
             onOpenReportModal={handleOpenTimesheetReport}
           />
+        ) : currentView === 'knowledge' ? (
+          <KnowledgeBaseView />
         ) : (
           /* PANNEAU DAILY REPORT DE L'ESPACE ACTIF (Exclut le Backlog) */
           <DailyReportPanel
@@ -1644,6 +1648,14 @@ export default function App() {
         year={timesheetReportMonth.year}
         month={timesheetReportMonth.month}
         entries={timesheetEntriesForReport}
+      />
+
+      {/* COPILOTE PMO INTERACTIF (Japandi Floating Chatbot) */}
+      <PmoCopilotWidget
+        onViewChange={setCurrentView}
+        tasks={tasks}
+        projects={projects}
+        activeSpaceId={currentSpace.id}
       />
     </div>
   );

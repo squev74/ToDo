@@ -14,14 +14,15 @@ import {
   Cloud,
   Sparkles,
   Clock,
+  BookOpen,
 } from 'lucide-react';
 import { Espace, Tache, Projet, ADMIN_EMAIL, ADMIN_UID } from '../types';
 import { WorkspaceSelector } from './WorkspaceSelector';
 import { useAuth } from '../context/AuthContext';
 
 export interface HeaderProps {
-  currentView: 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin';
-  onViewChange: (view: 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin') => void;
+  currentView: 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge';
+  onViewChange: (view: 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge') => void;
   spaces: Espace[];
   activeSpaceId: string;
   tasks: Tache[];
@@ -336,6 +337,21 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <Clock className="h-3.5 w-3.5" />
               <span>Feuille de Temps</span>
+            </button>
+
+            {/* Onglet : Base de Connaissances */}
+            <button
+              id="tab-view-knowledge"
+              type="button"
+              onClick={() => onViewChange('knowledge')}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
+                currentView === 'knowledge'
+                  ? 'bg-[#6B8E78] text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)]'
+                  : 'text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A]'
+              }`}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              <span>Base de Connaissance</span>
             </button>
 
             {/* Onglet : Administration - Visible UNIQUEMENT pour 'squeva11@gmail.com' ou role === 'admin' */}
