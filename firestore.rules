@@ -1,31 +1,46 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Permet le test de connexion initial
+    // Helper réutilisable pour l'authentification
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper de vérification d'identité
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Helper pour les administrateurs approuvés (Super Admin direct et admins déclarés)
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.uid == 'G1Dm03dHRvPelWT8c2ydqXLC1Y93' || 
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // 1. Règle globale de sécurité par défaut (Deny All)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Test initial de connexion (requis au démarrage du conteneur)
     match /test/connection {
       allow read, write: if true;
     }
 
-    // Collection des administrateurs
+    // 3. Collection des administrateurs
     match /admins/{adminId} {
-      allow read, write: if true;
+      allow read, write: if isOwner(adminId) || isAdmin();
     }
 
-    // Collection des profils utilisateurs et sous-collections
+    // 4. Profils utilisateurs, workspaces, projets, tâches, modèles et heures de travail
     match /users/{userId} {
-      allow read, write: if true;
+      allow read, write: if isOwner(userId) || isAdmin();
 
-      // Sous-collections (espaces, projets, tâches)
-      match /{document=**} {
-        allow read, write: if true;
+      match /{allSubcollections=**} {
+        allow read, write: if isOwner(userId) || isAdmin();
       }
-    }
-
-    // Règle globale de secours pour les collections de premier niveau
-    match /{document=**} {
-      allow read, write: if true;
     }
   }
 }
-
-
