@@ -40,7 +40,11 @@
         "couleur": { "type": "string" },
         "dateCreation": { "type": "string" },
         "userId": { "type": "string" },
-        "spaceId": { "type": "string" }
+        "spaceId": { "type": "string" },
+        "deliverables": { "type": "array" },
+        "teamMembers": { "type": "array" },
+        "allocations": { "type": "array" },
+        "raidLog": { "type": "array" }
       },
       "required": ["id", "nom", "couleur", "dateCreation", "spaceId"]
     },

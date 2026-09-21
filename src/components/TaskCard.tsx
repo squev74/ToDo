@@ -520,12 +520,24 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               <Clock className="h-3.5 w-3.5 text-slate-400" />
               <span>Dernière activité : <strong className="text-slate-700 font-medium">{formatLastActivityDate(effectiveActivityIso)}</strong></span>
             </span>
-            {task.dateRealisation && (
-              <span className="text-emerald-700 font-medium flex items-center gap-1">
-                <Check className="h-3 w-3 stroke-[3]" />
-                Terminée le : {formatDateOnly(task.dateRealisation)}
-              </span>
-            )}
+            {task.dateRealisation && (() => {
+              const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+              const elapsedMs = Date.now() - new Date(task.dateRealisation).getTime();
+              const remainingDays = Math.ceil((THIRTY_DAYS_MS - elapsedMs) / (24 * 60 * 60 * 1000));
+              return (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-emerald-700 font-medium flex items-center gap-1">
+                    <Check className="h-3 w-3 stroke-[3]" />
+                    Terminée le : {formatDateOnly(task.dateRealisation)}
+                  </span>
+                  {remainingDays > 0 && remainingDays <= 30 ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
+                      Archivage automatique dans {remainingDays} jour{remainingDays > 1 ? 's' : ''}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })()}
           </div>
 
           {/* SAISIE DU TEMPS RAPIDE JIRA */}

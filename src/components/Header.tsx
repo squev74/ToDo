@@ -15,14 +15,16 @@ import {
   Sparkles,
   Clock,
   BookOpen,
+  Archive,
 } from 'lucide-react';
 import { Espace, Tache, Projet, ADMIN_EMAIL, ADMIN_UID } from '../types';
 import { WorkspaceSelector } from './WorkspaceSelector';
 import { useAuth } from '../context/AuthContext';
+import { getActiveTasks } from '../utils/taskFilters';
 
 export interface HeaderProps {
-  currentView: 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge';
-  onViewChange: (view: 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge') => void;
+  currentView: 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge' | 'archives';
+  onViewChange: (view: 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge' | 'archives') => void;
   spaces: Espace[];
   activeSpaceId: string;
   tasks: Tache[];
@@ -61,13 +63,21 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Filtrer les éléments de l'espace actif pour les statistiques d'en-tête
   const currentSpaceTasks = tasks.filter((t) => t.spaceId === activeSpaceId);
-  const activeTasksCount = currentSpaceTasks.filter(
+  const rawActiveTasks = currentSpaceTasks.filter(
     (t) => (t.statut as string)?.toLowerCase() !== 'backlog'
-  ).length;
+  );
+  const activeTasksCount = getActiveTasks(rawActiveTasks).length;
   const backlogTasksCount = currentSpaceTasks.filter(
     (t) => (t.statut as string)?.toLowerCase() === 'backlog'
   ).length;
   const currentSpaceProjects = projects.filter((p) => p.spaceId === activeSpaceId);
+
+  const nowTime = Date.now();
+  const archivedTasksCount = currentSpaceTasks.filter((t) => {
+    if (t.statut !== 'Done' || !t.dateRealisation) return false;
+    const compTime = new Date(t.dateRealisation).getTime();
+    return !isNaN(compTime) && (nowTime - compTime) > (30 * 24 * 60 * 60 * 1000);
+  }).length;
 
   // Visibilité exclusive de l'administration pour 'squeva11@gmail.com' (UID: G1Dm03dHRvPelWT8c2ydqXLC1Y93) ou role === 'admin'
   const isSuperAdmin = Boolean(
@@ -352,6 +362,32 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <BookOpen className="h-3.5 w-3.5" />
               <span>Base de Connaissance</span>
+            </button>
+
+            {/* Onglet : Archives */}
+            <button
+              id="tab-view-archives"
+              type="button"
+              onClick={() => onViewChange('archives')}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition-all duration-300 ${
+                currentView === 'archives'
+                  ? 'bg-amber-700 text-white shadow-[0_2px_10px_rgba(0,0,0,0.02)]'
+                  : 'text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A]'
+              }`}
+            >
+              <Archive className="h-3.5 w-3.5" />
+              <span>Archives</span>
+              {archivedTasksCount > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-medium ${
+                    currentView === 'archives'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-[#F0EFEB] text-[#737873]'
+                  }`}
+                >
+                  {archivedTasksCount}
+                </span>
+              )}
             </button>
 
             {/* Onglet : Administration - Visible UNIQUEMENT pour 'squeva11@gmail.com' ou role === 'admin' */}

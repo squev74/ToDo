@@ -78,6 +78,8 @@ import { Header } from './components/Header';
 import { TaskFilterBar } from './components/TaskFilterBar';
 import { BacklogView } from './components/BacklogView';
 import { KnowledgeBaseView } from './components/KnowledgeBaseView';
+import { ArchivedTasksTab } from './components/ArchivedTasksTab';
+import { getActiveTasks } from './utils/taskFilters';
 import {
   updateTaskStatus,
   updateTaskDetails,
@@ -121,8 +123,8 @@ export default function App() {
     }
   };
 
-  // Navigation Vue Principale : 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge'
-  const [currentView, setCurrentView] = useState<'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge'>('tasks');
+  // Navigation Vue Principale : 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge' | 'archives'
+  const [currentView, setCurrentView] = useState<'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge' | 'archives'>('tasks');
   const [taskModalDefaultStatus, setTaskModalDefaultStatus] = useState<StatutTache>('Open');
 
   // Filtres et Recherche Multi-Sélection (null = tous visibles / aucun filtre appliqué, [] = aucun sélectionné)
@@ -398,9 +400,10 @@ export default function App() {
 
   // Tâches actives de l'espace (hors statut Backlog - vue principale Kanban opérationnelle)
   const activeSpaceTasks = useMemo(() => {
-    return currentSpaceTasks.filter(
+    const rawActive = currentSpaceTasks.filter(
       (t) => (t.statut as string)?.toLowerCase() !== 'backlog'
     );
+    return getActiveTasks(rawActive);
   }, [currentSpaceTasks]);
 
   // Tâches en attente dans le Backlog de l'espace actif
@@ -675,6 +678,42 @@ export default function App() {
     applyStatusChange(task.id, newStatus);
   };
 
+  const handleReopenTask = (task: Tache) => {
+    const minOrdre = currentSpaceTasks.reduce((min, t) => Math.min(min, t.ordre), 0);
+    const newOrdre = minOrdre - 1;
+
+    const updatedComments = [...(task.commentaires || [])];
+    updatedComments.push({
+      id: 'comm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+      texte: 'Tâche réouverte depuis les archives.',
+      date: new Date().toISOString(),
+    });
+
+    let updatedTask = updateTaskStatus(task, 'Open', {
+      newOrdre,
+    });
+    updatedTask = {
+      ...updatedTask,
+      userId: user?.uid || task.userId,
+      commentaires: updatedComments,
+    };
+
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
+
+    if (user && !user.isLocalFallback) {
+      saveTaskToFirestore(user.uid, updatedTask)
+        .then(() => {
+          showToast(`Tâche « ${task.titre} » réouverte.`);
+        })
+        .catch((err) => {
+          console.error('Erreur Firestore réouverture tâche:', err);
+          showToast('Erreur lors de la synchronisation.', 'error');
+        });
+    } else {
+      showToast(`Tâche « ${task.titre} » réouverte.`);
+    }
+  };
+
   const applyStatusChange = (taskId: string, newStatus: StatutTache, additionalComment?: string) => {
     const target = tasks.find((t) => t.id === taskId);
     if (!target) return;
@@ -799,7 +838,9 @@ export default function App() {
 
       showToast('Tâche mise à jour avec succès.');
     } else {
-      const maxOrdre = currentSpaceTasks.reduce((max, t) => Math.max(max, t.ordre), 0);
+      const minOrdre = currentSpaceTasks.length > 0
+        ? currentSpaceTasks.reduce((min, t) => Math.min(min, t.ordre), 0)
+        : 0;
       const comments = [];
       if (taskData.blockedReason && taskData.statut === 'Blocked') {
         comments.push({
@@ -817,7 +858,7 @@ export default function App() {
         projetId: taskData.projetId ?? null,
         statut: taskData.statut,
         dateEcheance: taskData.dateEcheance || null,
-        ordre: maxOrdre + 1,
+        ordre: minOrdre - 1,
         initialComments: comments,
       });
 
@@ -861,14 +902,16 @@ export default function App() {
 
   // Ajout rapide d'une tâche directement dans le Backlog avec initialisation lastActivityAt
   const handleQuickAddBacklogTask = (titre: string, projetId?: string | null) => {
-    const maxOrdre = currentSpaceTasks.reduce((max, t) => Math.max(max, t.ordre), 0);
+    const minOrdre = currentSpaceTasks.length > 0
+      ? currentSpaceTasks.reduce((min, t) => Math.min(min, t.ordre), 0)
+      : 0;
     const newTask = createNewTask({
       userId: user?.uid,
       spaceId: currentSpace.id,
       titre: titre.trim(),
       projetId: projetId ?? null,
       statut: 'Backlog',
-      ordre: maxOrdre + 1,
+      ordre: minOrdre - 1,
     });
 
     setTasks((prev) => [newTask, ...prev]);
@@ -1509,6 +1552,12 @@ export default function App() {
           />
         ) : currentView === 'knowledge' ? (
           <KnowledgeBaseView />
+        ) : currentView === 'archives' ? (
+          <ArchivedTasksTab
+            tasks={currentSpaceTasks}
+            projects={currentSpaceProjects}
+            onReopenTask={handleReopenTask}
+          />
         ) : (
           /* PANNEAU DAILY REPORT DE L'ESPACE ACTIF (Exclut le Backlog) */
           <DailyReportPanel

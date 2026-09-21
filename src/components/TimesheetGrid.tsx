@@ -195,24 +195,27 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
     return map;
   }, [entries]);
 
-  // Calculer la somme des heures par jour (pour le total de colonne)
+  // Calculer la somme des heures par jour (pour le total de colonne, excluant Vacances/Maladie)
   const dailyTotals = useMemo(() => {
     const totals: Record<string, number> = {};
     daysList.forEach((d) => {
       let sum = 0;
       projectsToRender.forEach((p) => {
-        const key = `${d.dateStr}_${p.code}`;
-        sum += entriesMap[key]?.hours || 0;
+        if (p.code !== 'Vacances/Maladie') {
+          const key = `${d.dateStr}_${p.code}`;
+          sum += entriesMap[key]?.hours || 0;
+        }
       });
       totals[d.dateStr] = sum;
     });
     return totals;
   }, [daysList, entriesMap, projectsToRender]);
 
-  // Calculer la somme des heures par projet (pour le total de ligne)
+  // Calculer la somme des heures par projet (pour le total de ligne et grand total opérationnel)
   const projectTotals = useMemo(() => {
     const totals: Record<string, number> = {};
     let grandTotal = 0;
+    let operationalGrandTotal = 0;
 
     projectsToRender.forEach((p) => {
       let sum = 0;
@@ -222,9 +225,12 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
       });
       totals[p.code] = sum;
       grandTotal += sum;
+      if (p.code !== 'Vacances/Maladie') {
+        operationalGrandTotal += sum;
+      }
     });
 
-    return { projects: totals, grandTotal };
+    return { projects: totals, grandTotal, operationalGrandTotal };
   }, [daysList, entriesMap, projectsToRender]);
 
   // Gérer la distribution de temps par code projet pour désactiver le masquage si total > 0
@@ -474,15 +480,17 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
         const totalProjet = projectTotals.projects[p.code] || 0;
         rowData.push(totalProjet);
 
-        const percent = projectTotals.grandTotal > 0 
-          ? ((totalProjet / projectTotals.grandTotal) * 100).toFixed(1) + '%'
-          : '0%';
+        const percent = p.code === 'Vacances/Maladie'
+          ? '-'
+          : projectTotals.operationalGrandTotal > 0 
+            ? ((totalProjet / projectTotals.operationalGrandTotal) * 100).toFixed(1) + '%'
+            : '0%';
         rowData.push(percent);
 
         return rowData;
       });
 
-      const totalsRow: (string | number)[] = ['TOTAL IMPUTÉ', '-', ...daysList.map((d) => dailyTotals[d.dateStr]), projectTotals.grandTotal, '100%'];
+      const totalsRow: (string | number)[] = ['TOTAL IMPUTÉ', '-', ...daysList.map((d) => dailyTotals[d.dateStr]), projectTotals.operationalGrandTotal, '100%'];
       rows.push(totalsRow);
 
       const csvContent = '\uFEFF' + [headers, ...rows]
@@ -599,7 +607,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
           </div>
           <div>
             <div className="text-[10px] uppercase font-semibold tracking-wider text-[#737873]">Total Imputé</div>
-            <div className="text-base font-bold text-[#1A1D1A] mt-0.5">{projectTotals.grandTotal} h</div>
+            <div className="text-base font-bold text-[#1A1D1A] mt-0.5">{projectTotals.operationalGrandTotal} h</div>
           </div>
         </div>
 
@@ -668,9 +676,11 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
               <tbody className="divide-y divide-[#F0EFEB]">
                 {projectsToRender.map((p) => {
                   const projTotal = projectTotals.projects[p.code] || 0;
-                  const projPercent = projectTotals.grandTotal > 0
-                    ? ((projTotal / projectTotals.grandTotal) * 100).toFixed(0)
-                    : '0';
+                  const projPercent = p.code === 'Vacances/Maladie'
+                    ? '-'
+                    : projectTotals.operationalGrandTotal > 0
+                      ? ((projTotal / projectTotals.operationalGrandTotal) * 100).toFixed(0) + '%'
+                      : '0%';
 
                   return (
                     <tr key={p.code} className="hover:bg-[#F9F8F6]/40 transition-colors">
@@ -734,7 +744,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
 
                       {/* % Distribution en bout de ligne */}
                       <td className="p-3 text-center text-xs font-medium text-[#737873] bg-[#F9F8F6]/20">
-                        {projPercent}%
+                        {projPercent}
                       </td>
                     </tr>
                   );
@@ -786,7 +796,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
                   
                   {/* Grand total d'imputation mensuel */}
                   <td className="p-3 text-center text-sm font-extrabold text-indigo-900 border-l border-[#F0EFEB] bg-indigo-50">
-                    {projectTotals.grandTotal}h
+                    {projectTotals.operationalGrandTotal}h
                   </td>
 
                   <td className="p-3 text-center text-xs text-[#737873] bg-[#F9F8F6]">

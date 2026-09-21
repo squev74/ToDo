@@ -146,6 +146,9 @@ export function sanitizeProjectForFirestore(project: Projet, userId: string): Re
     dateCreation: project.dateCreation || new Date().toISOString(),
     jiraKey: project.jiraKey || null,
     deliverables: project.deliverables || [],
+    teamMembers: project.teamMembers || [],
+    allocations: project.allocations || [],
+    raidLog: project.raidLog || [],
   });
 }
 
