@@ -93,6 +93,9 @@ import { TimesheetReportModal } from './components/TimesheetReportModal';
 import { TimeEntry } from './types/timesheet';
 import { fetchMonthTimeEntries, saveTimeEntry } from './services/timesheetService';
 import { PmoCopilotWidget } from './components/PmoCopilotWidget';
+import { generateGlobalAlerts } from './utils/pmoHealthCheck';
+import { GlobalPmoAttentionWidget } from './components/GlobalPmoAttentionWidget';
+import { ProjectHealthCheckBadge } from './components/ProjectHealthCheckBadge';
 
 export default function App() {
   const { user, loading: authLoading, logout, isAdmin, isApproved } = useAuth();
@@ -368,6 +371,24 @@ export default function App() {
     };
   }, [user, isApproved]);
 
+  // Chargement automatique des imputations du mois courant pour le Health Check
+  const [currentMonthEntries, setCurrentMonthEntries] = useState<TimeEntry[]>([]);
+
+  useEffect(() => {
+    if (!user || !isApproved || user.isLocalFallback) {
+      setCurrentMonthEntries([]);
+      return;
+    }
+    const d = new Date();
+    fetchMonthTimeEntries(user.uid, activeSpaceId, d.getFullYear(), d.getMonth() + 1)
+      .then((entries) => {
+        setCurrentMonthEntries(entries);
+      })
+      .catch((err) => {
+        console.error('Erreur de chargement des imputations pour le Health Check:', err);
+      });
+  }, [user, isApproved, activeSpaceId]);
+
   // Sauvegardes miroir dans le localStorage
   useEffect(() => {
     if (user?.uid && spaces.length > 0) {
@@ -423,6 +444,11 @@ export default function App() {
     currentSpaceProjects.forEach((p) => map.set(p.id, p));
     return map;
   }, [currentSpaceProjects]);
+
+  // Alertes du Health Check PMO pour l'espace actif
+  const healthCheckAlerts = useMemo(() => {
+    return generateGlobalAlerts(currentSpaceProjects, tasks, currentMonthEntries);
+  }, [currentSpaceProjects, tasks, currentMonthEntries]);
 
   // Modèles de tâches récurrentes de l'espace actif
   const currentSpaceRecurringTemplates = useMemo(() => {
@@ -1042,7 +1068,7 @@ export default function App() {
   };
 
   // Projets : Ajout dans l'espace actif
-  const handleAddProject = (nom: string, couleur: string, jiraKey?: string) => {
+  const handleAddProject = (nom: string, couleur: string, jiraKey?: string, hasCapacityPlanning = true, requiresTimesheet = true) => {
     const newProj: Projet = {
       id: 'proj-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
       userId: user?.uid,
@@ -1051,6 +1077,8 @@ export default function App() {
       couleur,
       dateCreation: new Date().toISOString(),
       jiraKey,
+      hasCapacityPlanning,
+      requiresTimesheet,
     };
     setProjects((prev) => [...prev, newProj]);
 
@@ -1072,7 +1100,9 @@ export default function App() {
     deliverables?: ProjectDeliverable[],
     teamMembers?: TeamMember[],
     allocations?: MonthlyAllocation[],
-    raidLog?: RaidItem[]
+    raidLog?: RaidItem[],
+    hasCapacityPlanning?: boolean,
+    requiresTimesheet?: boolean
   ) => {
     const updatedProj = projects.find((p) => p.id === projectId);
     if (!updatedProj) return;
@@ -1086,6 +1116,8 @@ export default function App() {
       teamMembers: teamMembers !== undefined ? teamMembers : updatedProj.teamMembers,
       allocations: allocations !== undefined ? allocations : updatedProj.allocations,
       raidLog: raidLog !== undefined ? raidLog : updatedProj.raidLog,
+      hasCapacityPlanning: hasCapacityPlanning !== undefined ? hasCapacityPlanning : updatedProj.hasCapacityPlanning,
+      requiresTimesheet: requiresTimesheet !== undefined ? requiresTimesheet : updatedProj.requiresTimesheet,
     };
 
     setProjects((prev) =>
@@ -1450,6 +1482,18 @@ export default function App() {
               onStatusSelectionChange={setSelectedStatuses}
               onResetFilters={handleResetFilters}
               overdueCount={overdueCount}
+            />
+
+            {/* PANNEAU PMO HEALTH CHECK PROACTIF */}
+            <GlobalPmoAttentionWidget
+              alerts={healthCheckAlerts}
+              onNavigateToTab={(tab) => setCurrentView(tab)}
+              onSelectProject={(projId) => {
+                const proj = currentSpaceProjects.find((p) => p.id === projId);
+                if (proj) {
+                  setSelectedProjectDetail(proj);
+                }
+              }}
             />
 
             {/* LISTE DES TÂCHES DE L'ESPACE */}

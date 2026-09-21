@@ -16,6 +16,7 @@ import { Projet, Tache, ProjectDeliverable, TeamMember, MonthlyAllocation, RaidI
 import { ProjectDeliverablesSection } from './ProjectDeliverablesSection';
 import { ProjectMonthlyCapacity } from './ProjectMonthlyCapacity';
 import { ProjectRaidLogSection } from './ProjectRaidLogSection';
+import { ProjectHealthCheckBadge } from './ProjectHealthCheckBadge';
 
 interface ProjectDetailViewProps {
   isOpen: boolean;
@@ -30,7 +31,9 @@ interface ProjectDetailViewProps {
     deliverables?: ProjectDeliverable[],
     teamMembers?: TeamMember[],
     allocations?: MonthlyAllocation[],
-    raidLog?: RaidItem[]
+    raidLog?: RaidItem[],
+    hasCapacityPlanning?: boolean,
+    requiresTimesheet?: boolean
   ) => void;
 }
 
@@ -109,7 +112,10 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
       project.jiraKey,
       updatedDeliverables,
       project.teamMembers,
-      project.allocations
+      project.allocations,
+      project.raidLog,
+      project.hasCapacityPlanning,
+      project.requiresTimesheet
     );
   };
 
@@ -122,7 +128,9 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
       project.deliverables,
       updatedMembers,
       updatedAllocations,
-      project.raidLog
+      project.raidLog,
+      project.hasCapacityPlanning,
+      project.requiresTimesheet
     );
   };
 
@@ -135,7 +143,9 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
       project.deliverables,
       project.teamMembers,
       project.allocations,
-      updatedRaidLog
+      updatedRaidLog,
+      project.hasCapacityPlanning,
+      project.requiresTimesheet
     );
   };
 
@@ -266,6 +276,83 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
         <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
           {activeTab === 'overview' && (
             <div className="space-y-6">
+              {/* Météo et Santé PMO */}
+              <ProjectHealthCheckBadge
+                projectId={project.id}
+                projects={[project]}
+                tasks={tasks}
+              />
+
+              {/* Options de gouvernance PMO */}
+              <div className="rounded-2xl border border-[#F0EFEB] bg-white p-4 space-y-4 shadow-xs">
+                <div className="flex items-center gap-1.5 pb-2 border-b border-[#F0EFEB]">
+                  <Folder className="h-4 w-4 text-[#5D7C68]" />
+                  <h3 className="text-xs font-bold text-[#1A1D1A]">Options de gouvernance PMO</h3>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="flex items-start gap-3 cursor-pointer group select-none">
+                    <input
+                      type="checkbox"
+                      checked={project.hasCapacityPlanning !== false}
+                      onChange={(e) => {
+                        onUpdateProject(
+                          project.id,
+                          project.nom,
+                          project.couleur,
+                          project.jiraKey,
+                          project.deliverables,
+                          project.teamMembers,
+                          project.allocations,
+                          project.raidLog,
+                          e.target.checked,
+                          project.requiresTimesheet !== false
+                        );
+                      }}
+                      className="mt-0.5 rounded border-[#EAE8E2] text-[#6B8E78] focus:ring-[#6B8E78] h-4 w-4 accent-[#6B8E78]"
+                    />
+                    <div>
+                      <span className="block text-xs font-semibold text-[#1A1D1A] group-hover:text-[#5D7C68] transition-colors">
+                        Activer le suivi du plan capacitaire pour ce projet
+                      </span>
+                      <span className="block text-[10.5px] text-[#737873] font-light mt-0.5 leading-relaxed">
+                        Si désactivé, ce projet ne fera l'objet d'aucune alerte capacitaire vide ou incomplète pour le mois en cours ou à venir.
+                      </span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-3 cursor-pointer group select-none">
+                    <input
+                      type="checkbox"
+                      checked={project.requiresTimesheet !== false}
+                      onChange={(e) => {
+                        onUpdateProject(
+                          project.id,
+                          project.nom,
+                          project.couleur,
+                          project.jiraKey,
+                          project.deliverables,
+                          project.teamMembers,
+                          project.allocations,
+                          project.raidLog,
+                          project.hasCapacityPlanning !== false,
+                          e.target.checked
+                        );
+                      }}
+                      className="mt-0.5 rounded border-[#EAE8E2] text-[#6B8E78] focus:ring-[#6B8E78] h-4 w-4 accent-[#6B8E78]"
+                    />
+                    <div>
+                      <span className="block text-xs font-semibold text-[#1A1D1A] group-hover:text-[#5D7C68] transition-colors">
+                        Exiger la saisie des feuilles de temps (Timesheet) pour ce projet
+                      </span>
+                      <span className="block text-[10.5px] text-[#737873] font-light mt-0.5 leading-relaxed">
+                        Si désactivé, aucune alerte de temps manquant ne sera levée si ce projet est le seul actif dans l'espace de travail.
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               {/* Carte de Progression */}
               <div className="rounded-2xl border border-[#F0EFEB] bg-white p-4 space-y-3.5">
                 <div className="flex items-center justify-between">

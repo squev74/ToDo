@@ -7,6 +7,7 @@ export interface ProjectDeliverable {
   type: 'planning' | 'doc' | 'report' | 'design' | 'other';
   status: 'planned' | 'in_progress' | 'delivered';
   deliveredAt?: string; // Format ISO ou date string
+  targetDate?: string; // Date d'échéance cible (YYYY-MM-DD)
 }
 
 export interface TeamMember {
@@ -36,6 +37,8 @@ export interface Projet {
   teamMembers?: TeamMember[];
   allocations?: MonthlyAllocation[];
   raidLog?: RaidItem[];
+  hasCapacityPlanning?: boolean;
+  requiresTimesheet?: boolean;
 }
 
 export type Project = Projet;

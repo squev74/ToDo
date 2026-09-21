@@ -48,6 +48,7 @@ export const ProjectDeliverablesSection: React.FC<ProjectDeliverablesSectionProp
   const [newUrl, setNewUrl] = useState('');
   const [newType, setNewType] = useState<ProjectDeliverable['type']>('doc');
   const [newStatus, setNewStatus] = useState<ProjectDeliverable['status']>('planned');
+  const [newTargetDate, setNewTargetDate] = useState('');
   const [error, setError] = useState('');
 
   // Édition en cours
@@ -56,6 +57,7 @@ export const ProjectDeliverablesSection: React.FC<ProjectDeliverablesSectionProp
   const [editUrl, setEditUrl] = useState('');
   const [editType, setEditType] = useState<ProjectDeliverable['type']>('doc');
   const [editStatus, setEditStatus] = useState<ProjectDeliverable['status']>('planned');
+  const [editTargetDate, setEditTargetDate] = useState('');
   const [editError, setEditError] = useState('');
 
   // Statistiques pour l'en-tête Japandi
@@ -102,6 +104,7 @@ export const ProjectDeliverablesSection: React.FC<ProjectDeliverablesSectionProp
       url: newUrl.trim(),
       type: newType,
       status: newStatus,
+      targetDate: newTargetDate || undefined,
       deliveredAt: newStatus === 'delivered' ? new Date().toISOString() : undefined,
     };
 
@@ -112,6 +115,7 @@ export const ProjectDeliverablesSection: React.FC<ProjectDeliverablesSectionProp
     setNewUrl('');
     setNewType('doc');
     setNewStatus('planned');
+    setNewTargetDate('');
     setIsAdding(false);
   };
 
@@ -121,6 +125,7 @@ export const ProjectDeliverablesSection: React.FC<ProjectDeliverablesSectionProp
     setEditUrl(item.url);
     setEditType(item.type);
     setEditStatus(item.status);
+    setEditTargetDate(item.targetDate || '');
     setEditError('');
   };
 
@@ -150,6 +155,7 @@ export const ProjectDeliverablesSection: React.FC<ProjectDeliverablesSectionProp
           url: editUrl.trim(),
           type: editType,
           status: editStatus,
+          targetDate: editTargetDate || undefined,
           deliveredAt: editStatus === 'delivered' ? (item.deliveredAt || new Date().toISOString()) : undefined,
         };
       }
@@ -245,7 +251,7 @@ export const ProjectDeliverablesSection: React.FC<ProjectDeliverablesSectionProp
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <label htmlFor="deliv-type" className="block text-[10px] font-medium text-[#737873] mb-1">Catégorie / Icône</label>
                 <select
@@ -272,6 +278,17 @@ export const ProjectDeliverablesSection: React.FC<ProjectDeliverablesSectionProp
                   <option value="in_progress">En cours</option>
                   <option value="delivered">Livré</option>
                 </select>
+              </div>
+
+              <div>
+                <label htmlFor="deliv-target-date" className="block text-[10px] font-medium text-[#737873] mb-1">Date d'échéance</label>
+                <input
+                  id="deliv-target-date"
+                  type="date"
+                  value={newTargetDate}
+                  onChange={(e) => setNewTargetDate(e.target.value)}
+                  className="w-full rounded-xl border border-[#EAE8E2] bg-white px-3 py-2 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-none transition-colors"
+                />
               </div>
             </div>
 
@@ -337,7 +354,7 @@ export const ProjectDeliverablesSection: React.FC<ProjectDeliverablesSectionProp
                         className="w-full rounded-lg border border-[#EAE8E2] bg-white px-2.5 py-1 text-xs text-[#1A1D1A] font-mono focus:border-[#6B8E78] focus:outline-none"
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="block text-[9px] font-medium text-[#737873]">Type</label>
                         <select
@@ -361,6 +378,15 @@ export const ProjectDeliverablesSection: React.FC<ProjectDeliverablesSectionProp
                           <option value="in_progress">En cours</option>
                           <option value="delivered">Livré</option>
                         </select>
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-medium text-[#737873]">Échéance</label>
+                        <input
+                          type="date"
+                          value={editTargetDate}
+                          onChange={(e) => setEditTargetDate(e.target.value)}
+                          className="w-full rounded-lg border border-[#EAE8E2] bg-white px-2 py-0.5 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-none"
+                        />
                       </div>
                     </div>
                   </div>
@@ -413,10 +439,22 @@ export const ProjectDeliverablesSection: React.FC<ProjectDeliverablesSectionProp
                         <ExternalLink className="h-3 w-3 shrink-0 text-[#737873]/50 inline" />
                       </a>
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       <span className="text-[10px] text-[#737873] truncate max-w-[150px] sm:max-w-[220px] font-mono">
                         {item.url.replace(/^https?:\/\/(www\.)?/, '')}
                       </span>
+                      {item.targetDate && (
+                        <span className="text-[10px] text-amber-700 font-medium flex items-center gap-1 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200/50">
+                          <Calendar className="h-2.5 w-2.5" />
+                          Éch. {item.targetDate}
+                        </span>
+                      )}
+                      {item.deliveredAt && (
+                        <span className="text-[10px] text-[#5D7C68] font-medium flex items-center gap-1 bg-[#6B8E78]/5 px-1.5 py-0.5 rounded border border-[#6B8E78]/10">
+                          <Check className="h-2.5 w-2.5" />
+                          Livré le {new Date(item.deliveredAt).toLocaleDateString('fr-FR')}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

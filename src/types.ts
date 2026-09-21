@@ -71,6 +71,8 @@ export interface Projet {
   teamMembers?: TeamMember[];
   allocations?: MonthlyAllocation[];
   raidLog?: RaidItem[];
+  hasCapacityPlanning?: boolean;
+  requiresTimesheet?: boolean;
 }
 
 export interface AppDataExport {

@@ -149,6 +149,8 @@ export function sanitizeProjectForFirestore(project: Projet, userId: string): Re
     teamMembers: project.teamMembers || [],
     allocations: project.allocations || [],
     raidLog: project.raidLog || [],
+    hasCapacityPlanning: project.hasCapacityPlanning !== false,
+    requiresTimesheet: project.requiresTimesheet !== false,
   });
 }
 
