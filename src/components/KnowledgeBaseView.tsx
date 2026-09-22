@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { KnowledgeDoc, KnowledgeCategory } from '../types';
 import { DocEditor } from './DocEditor';
+import { useAuth } from '../context/AuthContext';
+import { fetchKnowledgeDocs, saveKnowledgeDoc, deleteKnowledgeDoc } from '../services/knowledgeService';
 
 // Éléments de départ par défaut (Starter Pack pour l'utilisateur)
 const STARTER_DOCS: KnowledgeDoc[] = [
@@ -107,6 +109,9 @@ const CATEGORY_NAMES: Record<KnowledgeCategory, string> = {
 };
 
 export const KnowledgeBaseView: React.FC = () => {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+
   // Charger les documents existants depuis le localStorage ou utiliser les starters
   const [docs, setDocs] = useState<KnowledgeDoc[]>(() => {
     const local = localStorage.getItem('knowledge_docs_list');
@@ -120,9 +125,9 @@ export const KnowledgeBaseView: React.FC = () => {
     return STARTER_DOCS;
   });
 
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(
-    docs.length > 0 ? docs[0].id : null
-  );
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(() => {
+    return docs.length > 0 ? docs[0].id : null;
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
 
@@ -131,10 +136,44 @@ export const KnowledgeBaseView: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<KnowledgeCategory | 'all'>('all');
   const [selectedTag, setSelectedTag] = useState<string>('all');
 
-  // Sauvegarder les documents localement à chaque changement
+  // Synchronisation avec Firestore au montage ou quand l'utilisateur change
+  useEffect(() => {
+    if (!user?.uid) return;
+
+    const loadDocsFromFirestore = async () => {
+      setLoading(true);
+      try {
+        const firestoreDocs = await fetchKnowledgeDocs(user.uid);
+        if (firestoreDocs.length > 0) {
+          setDocs(firestoreDocs);
+        } else {
+          // Si la collection est vide, on initialise la base avec les starters
+          for (const sDoc of STARTER_DOCS) {
+            await saveKnowledgeDoc(user.uid, sDoc);
+          }
+          setDocs(STARTER_DOCS);
+        }
+      } catch (err) {
+        console.error('Erreur de récupération des SOPs depuis Firestore :', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDocsFromFirestore();
+  }, [user?.uid]);
+
+  // Sauvegarder les documents localement à chaque changement (LocalStorage en backup de secours)
   useEffect(() => {
     localStorage.setItem('knowledge_docs_list', JSON.stringify(docs));
   }, [docs]);
+
+  // Gérer la sélection automatique du premier document disponible
+  useEffect(() => {
+    if (!selectedDocId && docs.length > 0) {
+      setSelectedDocId(docs[0].id);
+    }
+  }, [docs, selectedDocId]);
 
   // Récupérer le document actuellement sélectionné
   const activeDoc = useMemo(() => {
@@ -170,7 +209,7 @@ export const KnowledgeBaseView: React.FC = () => {
   }, [docs, searchQuery, selectedCategory, selectedTag]);
 
   // Enregistrer ou modifier un document
-  const handleSaveDoc = (savedDoc: KnowledgeDoc) => {
+  const handleSaveDoc = async (savedDoc: KnowledgeDoc) => {
     setDocs(prevDocs => {
       const exists = prevDocs.some(d => d.id === savedDoc.id);
       if (exists) {
@@ -179,15 +218,32 @@ export const KnowledgeBaseView: React.FC = () => {
         return [savedDoc, ...prevDocs];
       }
     });
+
+    if (user?.uid) {
+      try {
+        await saveKnowledgeDoc(user.uid, savedDoc);
+      } catch (err) {
+        console.error('Erreur de sauvegarde de la SOP sur Firestore :', err);
+      }
+    }
+
     setSelectedDocId(savedDoc.id);
     setIsEditing(false);
     setIsCreatingNew(false);
   };
 
   // Supprimer un document
-  const handleDeleteDoc = (id: string) => {
+  const handleDeleteDoc = async (id: string) => {
     const remaining = docs.filter(d => d.id !== id);
     setDocs(remaining);
+
+    if (user?.uid) {
+      try {
+        await deleteKnowledgeDoc(user.uid, id);
+      } catch (err) {
+        console.error('Erreur de suppression de la SOP sur Firestore :', err);
+      }
+    }
     
     // Sélectionner un autre document s'il en reste
     if (remaining.length > 0) {
@@ -293,7 +349,12 @@ export const KnowledgeBaseView: React.FC = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto divide-y divide-[#F0EFEB]">
-            {filteredDocs.length === 0 ? (
+            {loading ? (
+              <div className="p-8 text-center text-[#737873] space-y-2">
+                <div className="w-5 h-5 border-2 border-[#6B8E78] border-t-transparent rounded-full animate-spin mx-auto" />
+                <p className="text-[11px] font-light">Sychronisation Cloud...</p>
+              </div>
+            ) : filteredDocs.length === 0 ? (
               <div className="p-8 text-center text-[#737873] space-y-2">
                 <FileText className="mx-auto h-8 w-8 text-[#737873]/30 stroke-[1.5]" />
                 <p className="text-xs">Aucun document ne correspond à vos filtres.</p>

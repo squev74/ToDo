@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   AlertOctagon, 
   AlertTriangle, 
@@ -27,7 +27,16 @@ export const GlobalPmoAttentionWidget: React.FC<GlobalPmoAttentionWidgetProps> =
   onNavigateToTab,
   onSelectProject,
 }) => {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(() => alerts.length > 0);
+
+  // Se replie automatiquement s'il n'y a plus aucune alerte active
+  useEffect(() => {
+    if (alerts.length === 0) {
+      setIsOpen(false);
+    } else {
+      setIsOpen(true);
+    }
+  }, [alerts.length]);
   const [activeSeverityFilter, setActiveSeverityFilter] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
   const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'timesheet' | 'delay' | 'stagnant' | 'capacity' | 'raid' | 'deliverable'>('all');
 
