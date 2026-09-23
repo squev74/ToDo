@@ -452,10 +452,11 @@ RÈGLES DE RÉDACTION :
         const message = errorData?.error?.message || `Erreur HTTP ${response.status}`;
         lastErrorMsg = message;
 
-        // Si le modèle est introuvable (404), interdit (403), ou si le quota est épuisé (429/exhausted/quota), ou erreur prépaiement/crédit, on essaye le suivant
+        // Si le modèle est interdit (403), de paiement requis (402), introuvable (404), ou si le quota est épuisé (429/exhausted/quota), ou erreur prépaiement/crédit, on essaye le suivant
         if (
-          response.status === 404 || 
+          response.status === 402 ||
           response.status === 403 || 
+          response.status === 404 || 
           response.status === 429 || 
           message.toLowerCase().includes('exhausted') || 
           message.toLowerCase().includes('quota') ||
@@ -486,10 +487,11 @@ RÈGLES DE RÉDACTION :
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       lastErrorMsg = msg;
-      // Si l'erreur mentionne un quota dépassé, modèle introuvable, refusé ou problème de prépaiement, on continue au modèle suivant
+      // Si l'erreur mentionne un quota dépassé, modèle introuvable, refusé, paiement ou problème de prépaiement, on continue au modèle suivant
       if (
-        msg.includes('404') || 
+        msg.includes('402') ||
         msg.includes('403') || 
+        msg.includes('404') || 
         msg.includes('429') || 
         msg.toLowerCase().includes('exhausted') || 
         msg.toLowerCase().includes('quota') || 

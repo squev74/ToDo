@@ -185,8 +185,9 @@ Rédige le rapport d'activité mensuel N+1 soigné maintenant.`;
           const message = errorData?.error?.message || `Erreur HTTP ${response.status}`;
           lastErrorMsg = message;
 
-          // Si le modèle est interdit (403), introuvable (404), quota dépassé (429) ou erreur crédit/prépaiement, on passe au suivant
+          // Si le modèle est interdit (403), de paiement requis (402), introuvable (404), quota dépassé (429) ou erreur crédit/prépaiement, on passe au suivant
           if (
+            response.status === 402 ||
             response.status === 403 || 
             response.status === 404 || 
             response.status === 429 || 
@@ -217,6 +218,7 @@ Rédige le rapport d'activité mensuel N+1 soigné maintenant.`;
         lastErrorMsg = msg;
         // Si l'erreur mentionne un refus d'accès, un quota épuisé, un modèle absent ou un problème de crédit/paiement, on continue
         if (
+          msg.includes('402') ||
           msg.includes('403') || 
           msg.includes('404') || 
           msg.includes('429') || 
