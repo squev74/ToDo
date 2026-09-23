@@ -32,7 +32,7 @@ export interface GenerateReportResult {
 
 /**
  * Récupère la clé d'API Gemini de façon sécurisée depuis les variables d'environnement.
- * Priorise VITE_GEMINI_API_KEY et retombe sur GEMINI_API_KEY si disponible.
+ * Priorise VITE_GEMINI_API_KEY, retombe sur GEMINI_API_KEY si disponible, ou localStorage pour les déploiements statiques.
  */
 export function getGeminiApiKey(): string {
   const metaEnv = (import.meta as unknown as { env?: Record<string, string | undefined> })?.env;
@@ -41,6 +41,12 @@ export function getGeminiApiKey(): string {
 
   if (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) {
     return process.env.GEMINI_API_KEY.trim();
+  }
+
+  // Fallback pour les déploiements statiques (GitHub Pages) sans recompilation
+  if (typeof window !== 'undefined') {
+    const localKey = window.localStorage.getItem('VITE_GEMINI_API_KEY')?.trim();
+    if (localKey) return localKey;
   }
 
   return '';
@@ -317,7 +323,11 @@ export async function generateActivityReport(params: {
       tasksCount: preparedTasks.length,
       projectsCount: uniqueProjects.length,
       error:
-        'Clé d’API Gemini non configurée. Veuillez renseigner la variable VITE_GEMINI_API_KEY dans votre configuration d’environnement.',
+        'Clé d’API Gemini non configurée.\n\n' +
+        'Pour l\'activer sur votre déploiement :\n' +
+        '1. (Recommandé) Ajoutez un secret de dépôt nommé GEMINI_API_KEY ou VITE_GEMINI_API_KEY sur GitHub.\n' +
+        '2. (Alternative rapide) Saisissez la commande suivante dans la console F12 de votre navigateur :\n' +
+        'localStorage.setItem("VITE_GEMINI_API_KEY", "VOTRE_CLE") puis rafraîchissez.',
     };
   }
 

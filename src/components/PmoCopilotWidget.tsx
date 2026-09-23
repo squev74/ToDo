@@ -93,7 +93,11 @@ export const PmoCopilotWidget: React.FC<PmoCopilotWidgetProps> = ({
       setMessages(prev => [...prev, {
         id: Math.random().toString(),
         sender: 'assistant',
-        text: "⚠️ Erreur de configuration : Clé d'API Gemini manquante. Veuillez renseigner la variable d'environnement `VITE_GEMINI_API_KEY` pour pouvoir échanger avec le Copilote PMO.",
+        text: "⚠️ Clé d'API Gemini manquante.\n\n" +
+              "Pour l'activer sur votre déploiement :\n\n" +
+              "1. **Via GitHub Secrets (Recommandé) :** Ajoutez un secret de dépôt nommé `GEMINI_API_KEY` ou `VITE_GEMINI_API_KEY` sur votre dépôt GitHub. Notre workflow de déploiement l'intégrera automatiquement lors du prochain build.\n" +
+              "2. **Alternative rapide sans recompilation :** Ouvrez la console de développement de votre navigateur (F12) sur votre site déployé et exécutez :\n" +
+              "`localStorage.setItem('VITE_GEMINI_API_KEY', 'VOTRE_CLE_GEMINI')` puis rafraîchissez la page.",
         timestamp: new Date(),
       }]);
       setIsLoading(false);
