@@ -411,7 +411,7 @@ RÈGLES DE RÉDACTION :
   userPrompt += `Rédige le compte-rendu professionnel adapté maintenant.`;
 
   // 4. Appel de l'API Gemini avec modèle performant Flash et fallback
-  const modelsToTry = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash'];
+  const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'];
   let lastErrorMsg = '';
 
   for (const modelName of modelsToTry) {
@@ -452,13 +452,17 @@ RÈGLES DE RÉDACTION :
         const message = errorData?.error?.message || `Erreur HTTP ${response.status}`;
         lastErrorMsg = message;
 
-        // Si le modèle est introuvable (404), interdit (403), ou si le quota est épuisé (429/exhausted/quota), on essaye le suivant
+        // Si le modèle est introuvable (404), interdit (403), ou si le quota est épuisé (429/exhausted/quota), ou erreur prépaiement/crédit, on essaye le suivant
         if (
           response.status === 404 || 
           response.status === 403 || 
           response.status === 429 || 
           message.toLowerCase().includes('exhausted') || 
-          message.toLowerCase().includes('quota')
+          message.toLowerCase().includes('quota') ||
+          message.toLowerCase().includes('credit') ||
+          message.toLowerCase().includes('prepayment') ||
+          message.toLowerCase().includes('billing') ||
+          message.toLowerCase().includes('payment')
         ) {
           continue;
         }
@@ -482,7 +486,7 @@ RÈGLES DE RÉDACTION :
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       lastErrorMsg = msg;
-      // Si l'erreur mentionne un quota dépassé, modèle introuvable ou refusé, on continue au modèle suivant
+      // Si l'erreur mentionne un quota dépassé, modèle introuvable, refusé ou problème de prépaiement, on continue au modèle suivant
       if (
         msg.includes('404') || 
         msg.includes('403') || 
@@ -490,7 +494,11 @@ RÈGLES DE RÉDACTION :
         msg.toLowerCase().includes('exhausted') || 
         msg.toLowerCase().includes('quota') || 
         msg.includes('not found') || 
-        msg.includes('permission')
+        msg.includes('permission') ||
+        msg.toLowerCase().includes('credit') ||
+        msg.toLowerCase().includes('prepayment') ||
+        msg.toLowerCase().includes('billing') ||
+        msg.toLowerCase().includes('payment')
       ) {
         continue;
       }

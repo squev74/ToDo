@@ -135,7 +135,7 @@ Question de l'utilisateur :
 Rédige une réponse claire et pragmatique.`;
 
       // 5. Appel de l'API Gemini avec modèle performant Flash et mécanisme de fallback résilient
-      const modelsToTry = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash'];
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'];
       let rawText = '';
       let apiSuccess = false;
       let lastErrorMsg = '';
@@ -174,13 +174,17 @@ Rédige une réponse claire et pragmatique.`;
             const message = errorData?.error?.message || `Erreur HTTP ${response.status}`;
             lastErrorMsg = message;
 
-            // Si le modèle est interdit (403), introuvable (404) ou quota dépassé (429 / resource_exhausted), on passe au suivant
+            // Si le modèle est interdit (403), introuvable (404), quota dépassé (429) ou erreur crédit/prépaiement, on passe au suivant
             if (
               response.status === 403 || 
               response.status === 404 || 
               response.status === 429 || 
               message.toLowerCase().includes('exhausted') || 
-              message.toLowerCase().includes('quota')
+              message.toLowerCase().includes('quota') ||
+              message.toLowerCase().includes('credit') ||
+              message.toLowerCase().includes('prepayment') ||
+              message.toLowerCase().includes('billing') ||
+              message.toLowerCase().includes('payment')
             ) {
               console.warn(`Modèle ${modelName} non accessible ou quota épuisé (HTTP ${response.status}). Essai du modèle suivant...`);
               continue;
@@ -196,7 +200,7 @@ Rédige une réponse claire et pragmatique.`;
           console.error(`Échec avec le modèle ${modelName}:`, err);
           const msg = err instanceof Error ? err.message : String(err);
           lastErrorMsg = msg;
-          // Si l'erreur mentionne un refus d'accès, un quota épuisé ou un modèle absent, on continue
+          // Si l'erreur mentionne un refus d'accès, un quota épuisé, un modèle absent ou un problème de crédit/paiement, on continue
           if (
             msg.includes('403') || 
             msg.includes('404') || 
@@ -204,7 +208,11 @@ Rédige une réponse claire et pragmatique.`;
             msg.toLowerCase().includes('exhausted') || 
             msg.toLowerCase().includes('quota') || 
             msg.includes('permission') || 
-            msg.includes('not found')
+            msg.includes('not found') ||
+            msg.toLowerCase().includes('credit') ||
+            msg.toLowerCase().includes('prepayment') ||
+            msg.toLowerCase().includes('billing') ||
+            msg.toLowerCase().includes('payment')
           ) {
             continue;
           }
