@@ -101,7 +101,7 @@ export function generateGlobalAlerts(
 
     // 2. TÂCHES EN RETARD
     projTasks.forEach((task) => {
-      if (task.statut !== 'Done' && task.statut !== 'backlog' && task.dateEcheance) {
+      if (task.statut !== 'Done' && task.statut !== 'backlog' && task.statut !== 'Backlog' && task.dateEcheance) {
         if (task.dateEcheance < currentDateStr) {
           const delayDays = getDaysDiff(currentDateStr, task.dateEcheance);
           alerts.push({
@@ -119,7 +119,7 @@ export function generateGlobalAlerts(
 
     // 3. TÂCHES STAGNANTES / INACTIVES (>= 7 jours)
     projTasks.forEach((task) => {
-      if (task.statut !== 'Done' && task.statut !== 'backlog') {
+      if (task.statut !== 'Done' && task.statut !== 'backlog' && task.statut !== 'Backlog') {
         const lastActivity = task.lastActivityAt || task.updatedAt || task.dateModification || task.createdAt;
         if (lastActivity) {
           const inactiveDays = getDaysDiff(currentDateStr, lastActivity.split('T')[0]);
