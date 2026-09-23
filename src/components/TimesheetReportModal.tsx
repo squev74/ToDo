@@ -45,6 +45,14 @@ export const TimesheetReportModal: React.FC<TimesheetReportModalProps> = ({
   const [copied, setCopied] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  // État local pour configurer la clé API directement si elle n'est pas dans l'environnement
+  const [customApiKey, setCustomApiKey] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('VITE_GEMINI_API_KEY') || '';
+    }
+    return '';
+  });
+
   // Fonction pour alléger et compresser les entrées de temps avant l'envoi
   const compressAndLightenTimeEntries = (timeEntries: TimeEntry[]) => {
     // Regrouper par projet pour limiter la taille du JSON et optimiser les coûts
@@ -136,7 +144,7 @@ ${JSON.stringify(compressedData, null, 2)}
 
 Rédige le rapport d'activité mensuel N+1 soigné maintenant.`;
 
-    const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+    const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-3.1-flash-lite'];
     let lastErrorMsg = '';
 
     for (const modelName of modelsToTry) {
@@ -177,7 +185,18 @@ Rédige le rapport d'activité mensuel N+1 soigné maintenant.`;
           const message = errorData?.error?.message || `Erreur HTTP ${response.status}`;
           lastErrorMsg = message;
 
-          if (response.status === 404) {
+          // Si le modèle est interdit (403), introuvable (404), quota dépassé (429) ou erreur crédit/prépaiement, on passe au suivant
+          if (
+            response.status === 403 || 
+            response.status === 404 || 
+            response.status === 429 || 
+            message.toLowerCase().includes('exhausted') || 
+            message.toLowerCase().includes('quota') ||
+            message.toLowerCase().includes('credit') ||
+            message.toLowerCase().includes('prepayment') ||
+            message.toLowerCase().includes('billing') ||
+            message.toLowerCase().includes('payment')
+          ) {
             continue;
           }
           throw new Error(message);
@@ -196,9 +215,23 @@ Rédige le rapport d'activité mensuel N+1 soigné maintenant.`;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         lastErrorMsg = msg;
-        if (!msg.includes('404') && !msg.includes('not found')) {
-          break;
+        // Si l'erreur mentionne un refus d'accès, un quota épuisé, un modèle absent ou un problème de crédit/paiement, on continue
+        if (
+          msg.includes('403') || 
+          msg.includes('404') || 
+          msg.includes('429') || 
+          msg.toLowerCase().includes('exhausted') || 
+          msg.toLowerCase().includes('quota') || 
+          msg.includes('permission') || 
+          msg.includes('not found') ||
+          msg.toLowerCase().includes('credit') ||
+          msg.toLowerCase().includes('prepayment') ||
+          msg.toLowerCase().includes('billing') ||
+          msg.toLowerCase().includes('payment')
+        ) {
+          continue;
         }
+        break;
       }
     }
 
@@ -251,6 +284,50 @@ Rédige le rapport d'activité mensuel N+1 soigné maintenant.`;
           >
             <X className="h-5 w-5" />
           </button>
+        </div>
+
+        {/* CONFIGURATION DE LA CLÉ GEMINI (SURCHARGE) */}
+        <div className="mt-4 px-4 py-3 rounded-xl bg-slate-50 border border-slate-200/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs shrink-0">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-slate-500" />
+            <div>
+              <p className="font-semibold text-slate-700">Clé d&apos;API Gemini</p>
+              <p className="text-[10px] text-slate-500">
+                {customApiKey 
+                  ? "Surchargée localement (clé personnelle active)." 
+                  : "Utilise la clé du système. Vous pouvez la surcharger :"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <input
+              type="password"
+              placeholder="Collez votre clé (AIzaSy...)"
+              value={customApiKey}
+              onChange={(e) => {
+                const val = e.target.value.trim();
+                setCustomApiKey(val);
+                if (val) {
+                  window.localStorage.setItem('VITE_GEMINI_API_KEY', val);
+                } else {
+                  window.localStorage.removeItem('VITE_GEMINI_API_KEY');
+                }
+              }}
+              className="w-full sm:w-52 px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white text-xs text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 placeholder:text-gray-400"
+            />
+            {customApiKey && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.localStorage.removeItem('VITE_GEMINI_API_KEY');
+                  setCustomApiKey('');
+                }}
+                className="text-[10px] text-red-600 hover:underline font-medium shrink-0 cursor-pointer"
+              >
+                Effacer
+              </button>
+            )}
+          </div>
         </div>
 
         {/* CONTENU CENTRAL SCROLLABLE */}
