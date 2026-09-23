@@ -35,7 +35,13 @@ export interface GenerateReportResult {
  * Priorise VITE_GEMINI_API_KEY, retombe sur GEMINI_API_KEY si disponible, ou localStorage pour les déploiements statiques.
  */
 export function getGeminiApiKey(): string {
-  // Remplacement littéral statique obligatoire par Vite au build
+  // 1. Priorité absolue à la clé saisie manuellement par l'utilisateur (localStorage)
+  if (typeof window !== 'undefined') {
+    const localKey = window.localStorage.getItem('VITE_GEMINI_API_KEY')?.trim();
+    if (localKey) return localKey;
+  }
+
+  // 2. Remplacement littéral statique par Vite au build
   const viteKey = import.meta.env.VITE_GEMINI_API_KEY;
   if (viteKey && viteKey.trim()) {
     return viteKey.trim();
@@ -43,12 +49,6 @@ export function getGeminiApiKey(): string {
 
   if (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) {
     return process.env.GEMINI_API_KEY.trim();
-  }
-
-  // Fallback pour les déploiements statiques (GitHub Pages) sans recompilation
-  if (typeof window !== 'undefined') {
-    const localKey = window.localStorage.getItem('VITE_GEMINI_API_KEY')?.trim();
-    if (localKey) return localKey;
   }
 
   return '';

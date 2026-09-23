@@ -266,25 +266,26 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
 
         {/* 2. ZONE DE CONFIGURATION ET FILTRAGE DE LA PÉRIODE */}
         <div className="border-b border-[#F0EFEB] bg-[#F9F8F6] p-4 sm:p-5 shrink-0 space-y-3.5">
-          {/* Alerte et configuration de la clé API si absente */}
-          {!hasApiKey ? (
-            <div
-              id="gemini-key-warning"
-              className="flex flex-col sm:flex-row items-start sm:items-center gap-3 rounded-xl border border-[#C89B7B]/30 bg-[#C89B7B]/10 p-3.5 text-xs text-[#966847]"
-            >
-              <AlertCircle className="h-4.5 w-4.5 shrink-0 text-[#966847] mt-0.5 sm:mt-0" />
-              <div className="flex-1 space-y-1">
-                <p className="font-semibold text-xs">
-                  Clé d&apos;API Gemini non configurée
-                </p>
-                <p className="text-[10.5px] leading-relaxed opacity-95">
-                  Renseignez votre clé d&apos;API Gemini pour activer l&apos;Intelligence Artificielle en l&apos;enregistrant localement :
-                </p>
+          {/* Configuration de la clé d'API Gemini */}
+          <div className="rounded-xl border border-[#C89B7B]/20 bg-[#C89B7B]/5 p-3.5 text-xs text-[#966847]">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4.5 w-4.5 shrink-0 text-[#966847]" />
+                <div>
+                  <p className="font-semibold text-xs">
+                    Configuration Clé d&apos;API Gemini
+                  </p>
+                  <p className="text-[10.5px] opacity-90">
+                    {customApiKey 
+                      ? "Surchargée localement (votre clé personnelle est active)." 
+                      : "Utilise la clé par défaut du système. Vous pouvez la surcharger ci-contre :"}
+                  </p>
+                </div>
               </div>
-              <div className="flex w-full sm:w-auto items-center gap-2 mt-1 sm:mt-0">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <input
                   type="password"
-                  placeholder="AIzaSy..."
+                  placeholder="Saisir clé perso (AIzaSy...)"
                   value={customApiKey}
                   onChange={(e) => {
                     const val = e.target.value.trim();
@@ -295,29 +296,23 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
                       window.localStorage.removeItem('VITE_GEMINI_API_KEY');
                     }
                   }}
-                  className="w-full sm:w-48 px-2.5 py-1.5 rounded-lg border border-[#C89B7B]/30 bg-white text-xs text-[#1A1D1A] focus:outline-hidden focus:ring-1 focus:ring-[#966847]/40 placeholder:text-gray-400"
+                  className="w-full sm:w-56 px-2.5 py-1.5 rounded-lg border border-[#C89B7B]/30 bg-white text-xs text-[#1A1D1A] focus:outline-hidden focus:ring-1 focus:ring-[#966847]/40 placeholder:text-gray-400"
                 />
+                {customApiKey && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.localStorage.removeItem('VITE_GEMINI_API_KEY');
+                      setCustomApiKey('');
+                    }}
+                    className="text-[10px] text-red-600 hover:underline font-medium shrink-0"
+                  >
+                    Effacer
+                  </button>
+                )}
               </div>
             </div>
-          ) : (
-            // Petit indicateur discret que la clé est configurée localement par rapport à l'environnement
-            !getGeminiApiKey() && (
-              <div className="text-[10px] text-[#737873] font-light flex items-center gap-1.5 px-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-                <span>Clé d&apos;API configurée localement (Stockage sécurisé du navigateur)</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.localStorage.removeItem('VITE_GEMINI_API_KEY');
-                    setCustomApiKey('');
-                  }}
-                  className="underline hover:text-red-600 ml-1 cursor-pointer transition-colors"
-                >
-                  (Effacer)
-                </button>
-              </div>
-            )
-          )}
+          </div>
 
           {/* Formulaire Grid : Date Début & Date Fin, Périmètre, Destinataire */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
