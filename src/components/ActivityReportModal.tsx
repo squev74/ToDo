@@ -69,6 +69,14 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
   const [activeTab, setActiveTab] = useState<'preview' | 'raw'>('preview');
   const [copied, setCopied] = useState<boolean>(false);
 
+  // État local pour configurer la clé API directement si elle n'est pas dans l'environnement
+  const [customApiKey, setCustomApiKey] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('VITE_GEMINI_API_KEY') || '';
+    }
+    return '';
+  });
+
   // Filtrer les projets appartenant à l'espace actif
   const spaceProjects = useMemo(() => {
     return projects.filter((p) => p.spaceId === activeSpace.id);
@@ -107,7 +115,7 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
   }, [matchingTasks]);
 
   // Vérification de la présence de la clé API
-  const hasApiKey = Boolean(getGeminiApiKey());
+  const hasApiKey = Boolean(getGeminiApiKey() || customApiKey);
 
   // Raccourcis de sélection de dates
   const setQuickPreset = (preset: 'currentWeek' | 'last7days' | 'today' | 'currentMonth') => {
@@ -258,23 +266,57 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
 
         {/* 2. ZONE DE CONFIGURATION ET FILTRAGE DE LA PÉRIODE */}
         <div className="border-b border-[#F0EFEB] bg-[#F9F8F6] p-4 sm:p-5 shrink-0 space-y-3.5">
-          {/* Alerte si la clé API n'est pas détectée */}
-          {!hasApiKey && (
+          {/* Alerte et configuration de la clé API si absente */}
+          {!hasApiKey ? (
             <div
               id="gemini-key-warning"
-              className="flex items-start gap-2.5 rounded-xl border border-[#C89B7B]/30 bg-[#C89B7B]/10 p-3 text-xs text-[#966847]"
+              className="flex flex-col sm:flex-row items-start sm:items-center gap-3 rounded-xl border border-[#C89B7B]/30 bg-[#C89B7B]/10 p-3.5 text-xs text-[#966847]"
             >
-              <AlertCircle className="h-4 w-4 shrink-0 text-[#966847] mt-0.5" />
-              <div className="space-y-1">
-                <p className="font-medium">
-                  Clé d&apos;API Gemini (`VITE_GEMINI_API_KEY`) non renseignée
+              <AlertCircle className="h-4.5 w-4.5 shrink-0 text-[#966847] mt-0.5 sm:mt-0" />
+              <div className="flex-1 space-y-1">
+                <p className="font-semibold text-xs">
+                  Clé d&apos;API Gemini non configurée
                 </p>
-                <p className="text-[11px] leading-relaxed opacity-90">
-                  Pour que l&apos;intelligence artificielle puisse générer votre compte-rendu,
-                  renseignez votre clé Gemini dans les variables d&apos;environnement.
+                <p className="text-[10.5px] leading-relaxed opacity-95">
+                  Renseignez votre clé d&apos;API Gemini pour activer l&apos;Intelligence Artificielle en l&apos;enregistrant localement :
                 </p>
               </div>
+              <div className="flex w-full sm:w-auto items-center gap-2 mt-1 sm:mt-0">
+                <input
+                  type="password"
+                  placeholder="AIzaSy..."
+                  value={customApiKey}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    setCustomApiKey(val);
+                    if (val) {
+                      window.localStorage.setItem('VITE_GEMINI_API_KEY', val);
+                    } else {
+                      window.localStorage.removeItem('VITE_GEMINI_API_KEY');
+                    }
+                  }}
+                  className="w-full sm:w-48 px-2.5 py-1.5 rounded-lg border border-[#C89B7B]/30 bg-white text-xs text-[#1A1D1A] focus:outline-hidden focus:ring-1 focus:ring-[#966847]/40 placeholder:text-gray-400"
+                />
+              </div>
             </div>
+          ) : (
+            // Petit indicateur discret que la clé est configurée localement par rapport à l'environnement
+            !getGeminiApiKey() && (
+              <div className="text-[10px] text-[#737873] font-light flex items-center gap-1.5 px-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <span>Clé d&apos;API configurée localement (Stockage sécurisé du navigateur)</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.localStorage.removeItem('VITE_GEMINI_API_KEY');
+                    setCustomApiKey('');
+                  }}
+                  className="underline hover:text-red-600 ml-1 cursor-pointer transition-colors"
+                >
+                  (Effacer)
+                </button>
+              </div>
+            )
           )}
 
           {/* Formulaire Grid : Date Début & Date Fin, Périmètre, Destinataire */}

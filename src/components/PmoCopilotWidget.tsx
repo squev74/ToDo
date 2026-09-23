@@ -48,6 +48,14 @@ export const PmoCopilotWidget: React.FC<PmoCopilotWidgetProps> = ({
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
+  // État local pour configurer la clé API directement si elle n'est pas dans l'environnement
+  const [customApiKey, setCustomApiKey] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('VITE_GEMINI_API_KEY') || '';
+    }
+    return '';
+  });
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Initialiser la discussion avec un message de bienvenue chaleureux
@@ -88,16 +96,15 @@ export const PmoCopilotWidget: React.FC<PmoCopilotWidgetProps> = ({
     setIsLoading(true);
 
     // 2. Extraire la clé d'API de manière sécurisée
-    const apiKey = getGeminiApiKey();
+    const apiKey = getGeminiApiKey() || customApiKey;
     if (!apiKey) {
       setMessages(prev => [...prev, {
         id: Math.random().toString(),
         sender: 'assistant',
         text: "⚠️ Clé d'API Gemini manquante.\n\n" +
               "Pour l'activer sur votre déploiement :\n\n" +
-              "1. **Via GitHub Secrets (Recommandé) :** Ajoutez un secret de dépôt nommé `GEMINI_API_KEY` ou `VITE_GEMINI_API_KEY` sur votre dépôt GitHub. Notre workflow de déploiement l'intégrera automatiquement lors du prochain build.\n" +
-              "2. **Alternative rapide sans recompilation :** Ouvrez la console de développement de votre navigateur (F12) sur votre site déployé et exécutez :\n" +
-              "`localStorage.setItem('VITE_GEMINI_API_KEY', 'VOTRE_CLE_GEMINI')` puis rafraîchissez la page.",
+              "1. **Renseignez la clé ci-dessus** directement dans le bandeau de configuration de ce volet.\n" +
+              "2. **Alternative robuste :** Ajoutez un secret de dépôt nommé `GEMINI_API_KEY` ou `VITE_GEMINI_API_KEY` sur votre dépôt GitHub.",
         timestamp: new Date(),
       }]);
       setIsLoading(false);
@@ -321,7 +328,7 @@ Rédige une réponse claire et pragmatique.`;
           className="fixed bottom-24 right-6 z-50 w-[420px] max-w-[calc(100vw-32px)] h-[580px] max-h-[calc(100vh-120px)] flex flex-col rounded-2xl border border-[#F0EFEB] bg-[#FAF9F6] shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-300"
         >
           {/* En-tête */}
-          <div className="px-5 py-4 bg-white border-b border-[#F0EFEB] flex items-center justify-between">
+          <div className="px-5 py-4 bg-white border-b border-[#F0EFEB] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-full bg-[#FAF9F6] border border-[#6B8E78]/20 flex items-center justify-center">
                 <Sparkles className="h-4.5 w-4.5 text-[#6B8E78]" />
@@ -338,6 +345,51 @@ Rédige une réponse claire et pragmatique.`;
               <X className="h-4 w-4" />
             </button>
           </div>
+
+          {/* Configuration ou statut de la clé API si absente de l'environnement */}
+          {!getGeminiApiKey() && (
+            <div className="px-5 py-2.5 bg-[#FAF9F6] border-b border-[#F0EFEB] flex flex-col gap-1.5 shrink-0">
+              {!customApiKey ? (
+                <div className="flex flex-col gap-1">
+                  <span className="text-[10px] text-amber-700 font-medium">⚠️ Clé d&apos;API Gemini absente de l&apos;environnement</span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="password"
+                      placeholder="Collez votre clé API Gemini (AIzaSy...)"
+                      value={customApiKey}
+                      onChange={(e) => {
+                        const val = e.target.value.trim();
+                        setCustomApiKey(val);
+                        if (val) {
+                          window.localStorage.setItem('VITE_GEMINI_API_KEY', val);
+                        } else {
+                          window.localStorage.removeItem('VITE_GEMINI_API_KEY');
+                        }
+                      }}
+                      className="flex-1 px-2.5 py-1.5 rounded-lg border border-amber-200 bg-white text-[10px] focus:outline-hidden focus:ring-1 focus:ring-amber-500 placeholder:text-gray-400"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between text-[10px] text-emerald-700 bg-emerald-50/50 p-1.5 rounded-lg border border-emerald-100">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Clé API configurée localement</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.localStorage.removeItem('VITE_GEMINI_API_KEY');
+                      setCustomApiKey('');
+                    }}
+                    className="underline text-red-600 font-semibold cursor-pointer text-[9px]"
+                  >
+                    Effacer
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Zone des messages */}
           <div className="flex-1 overflow-y-auto p-5 space-y-4">
