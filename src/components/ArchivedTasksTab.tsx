@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useTaskFiltersPersist } from '../hooks/useTaskFiltersPersist';
 import { Search, RotateCcw, Calendar, Folder, RefreshCw, Inbox, AlertCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Task, Projet } from '../types';
@@ -8,19 +9,79 @@ interface ArchivedTasksTabProps {
   tasks: Task[];
   projects: Projet[];
   onReopenTask: (task: Task) => void;
+  activeSpaceId?: string;
 }
 
 export const ArchivedTasksTab: React.FC<ArchivedTasksTabProps> = ({
   tasks,
   projects,
   onReopenTask,
+  activeSpaceId,
 }) => {
-  const [filters, setFilters] = useState<ArchiveFilters>({
-    projectId: 'all',
-    startDate: '',
-    endDate: '',
-    searchQuery: '',
-  });
+  // Archives state isolation and persistence
+  const [projectIdFilterState, setProjectIdFilterState] = useState('all');
+
+  // Charger le dernier projet archivé au changement d'espace
+  useEffect(() => {
+    if (!activeSpaceId) return;
+    try {
+      const saved = localStorage.getItem(`pmo_last_archive_project_${activeSpaceId}`);
+      setProjectIdFilterState(saved || 'all');
+    } catch (err) {
+      console.error('Erreur chargement projet archives:', err);
+      setProjectIdFilterState('all');
+    }
+  }, [activeSpaceId]);
+
+  // Sauvegarder le dernier projet archivé dès qu'il change
+  useEffect(() => {
+    if (!activeSpaceId) return;
+
+    // Vérifier si le projet sélectionné appartient bien à l'espace courant, ou s'il est global (all)
+    const isValidProject = projectIdFilterState === 'all' || 
+      projects.some(p => p.id === projectIdFilterState && (p.spaceId || 'default') === activeSpaceId);
+
+    if (!isValidProject) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(`pmo_last_archive_project_${activeSpaceId}`, projectIdFilterState);
+    } catch (err) {
+      console.error('Erreur sauvegarde projet archives:', err);
+    }
+  }, [projectIdFilterState, activeSpaceId, projects]);
+
+  const resolvedProjectIdForStorage = useMemo(() => {
+    if (projectIdFilterState && projectIdFilterState !== 'all') {
+      return projectIdFilterState;
+    }
+    return 'global';
+  }, [projectIdFilterState]);
+
+  const defaultArchiveFilters = useMemo(() => {
+    return {
+      searchQuery: '',
+      projectId: projectIdFilterState,
+      startDate: '',
+      endDate: '',
+      selectedStatuses: ['Done'] as string[],
+    };
+  }, [projectIdFilterState]);
+
+  const {
+    filters: archiveFilters,
+    updateFilters: updateArchiveFilters,
+    resetFilters: resetArchiveFilters,
+  } = useTaskFiltersPersist('archive', resolvedProjectIdForStorage, defaultArchiveFilters, activeSpaceId);
+
+  // Expose synchronized filters state
+  const filters = useMemo<ArchiveFilters>(() => ({
+    projectId: archiveFilters.projectId,
+    startDate: archiveFilters.startDate || '',
+    endDate: archiveFilters.endDate || '',
+    searchQuery: archiveFilters.searchQuery,
+  }), [archiveFilters]);
 
   // Mémoriser la map des projets pour un accès rapide (id -> Projet)
   const projectsMap = useMemo(() => {
@@ -35,19 +96,15 @@ export const ArchivedTasksTab: React.FC<ArchivedTasksTabProps> = ({
   }, [tasks, filters]);
 
   const handleResetFilters = () => {
-    setFilters({
-      projectId: 'all',
-      startDate: '',
-      endDate: '',
-      searchQuery: '',
-    });
+    resetArchiveFilters();
+    setProjectIdFilterState('all');
   };
 
   const handleFilterChange = (key: keyof ArchiveFilters, value: string) => {
-    setFilters((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
+    if (key === 'projectId') {
+      setProjectIdFilterState(value);
+    }
+    updateArchiveFilters({ [key]: value });
   };
 
   // Formater joliment la date d'achèvement
@@ -157,7 +214,7 @@ export const ArchivedTasksTab: React.FC<ArchivedTasksTabProps> = ({
           <button
             onClick={handleResetFilters}
             title="Réinitialiser les filtres"
-            className="flex items-center justify-center p-2 bg-white border border-[#DDD9CE] hover:bg-[#FAF8F5] active:bg-[#EDEAE4] rounded w-full text-xs text-[#8C877E] hover:text-[#4A4742] transition-colors shadow-sm"
+            className="flex items-center justify-center p-2 bg-white border border-[#DDD9CE]/60 hover:bg-[#F9F8F6] rounded text-xs text-[#C89B7B] hover:text-[#7f5434] transition-colors cursor-pointer"
           >
             <RotateCcw className="h-4 w-4" />
           </button>
@@ -210,11 +267,27 @@ export const ArchivedTasksTab: React.FC<ArchivedTasksTabProps> = ({
 
                     {/* Titre & Description */}
                     <td className="p-4">
-                      <div className="font-semibold text-[#2A2824]">{task.titre}</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-[#2A2824]">{task.titre}</span>
+                        {task.statut === 'Cancelled' ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-50 text-rose-700 border border-rose-100">
+                            Annulé
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            Terminé
+                          </span>
+                        )}
+                      </div>
                       {task.description && (
                         <p className="text-[#8C877E] text-[11px] mt-0.5 line-clamp-2 max-w-lg">
                           {task.description}
                         </p>
+                      )}
+                      {task.cancellationReason && (
+                        <div className="mt-1.5 text-rose-700 text-[10px] bg-rose-50/50 border border-rose-100 rounded px-2 py-0.5 inline-block max-w-lg font-light leading-snug">
+                          <strong>Motif :</strong> {task.cancellationReason}
+                        </div>
                       )}
                     </td>
 

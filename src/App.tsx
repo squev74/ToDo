@@ -66,6 +66,7 @@ import { AdminPanel } from './components/AdminPanel';
 import { TaskItem } from './components/TaskItem';
 import { TaskFormModal } from './components/TaskFormModal';
 import { BlockedReasonModal } from './components/BlockedReasonModal';
+import { CancellationReasonModal } from './components/CancellationReasonModal';
 import { ProjectManagerModal } from './components/ProjectManagerModal';
 import { ProjectDetailView } from './components/ProjectDetailView';
 import { ConfirmationModal } from './components/ConfirmationModal';
@@ -80,18 +81,20 @@ import { BacklogView } from './components/BacklogView';
 import { KnowledgeBaseView } from './components/KnowledgeBaseView';
 import { ArchivedTasksTab } from './components/ArchivedTasksTab';
 import { getActiveTasks } from './utils/taskFilters';
+import { useTaskFiltersPersist } from './hooks/useTaskFiltersPersist';
 import {
   updateTaskStatus,
   updateTaskDetails,
   addTaskComment,
   createNewTask,
 } from './services/taskService';
+import { AnalyticsReportingView } from './views/AnalyticsReportingView';
 
 // Module Timesheet et imputations de temps JIRA
 import { TimesheetGrid } from './components/TimesheetGrid';
 import { TimesheetReportModal } from './components/TimesheetReportModal';
 import { TimeEntry } from './types/timesheet';
-import { fetchMonthTimeEntries, saveTimeEntry } from './services/timesheetService';
+import { fetchMonthTimeEntries, saveTimeEntry, fetchAllTimeEntries } from './services/timesheetService';
 import { PmoCopilotWidget } from './components/PmoCopilotWidget';
 import { generateGlobalAlerts } from './utils/pmoHealthCheck';
 import { GlobalPmoAttentionWidget } from './components/GlobalPmoAttentionWidget';
@@ -126,14 +129,80 @@ export default function App() {
     }
   };
 
-  // Navigation Vue Principale : 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge' | 'archives'
-  const [currentView, setCurrentView] = useState<'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge' | 'archives'>('tasks');
+  // Navigation Vue Principale : 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge' | 'archives' | 'analytics'
+  const [currentView, setCurrentView] = useState<'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge' | 'archives' | 'analytics'>('tasks');
   const [taskModalDefaultStatus, setTaskModalDefaultStatus] = useState<StatutTache>('Open');
 
-  // Filtres et Recherche Multi-Sélection (null = tous visibles / aucun filtre appliqué, [] = aucun sélectionné)
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProjectIds, setSelectedProjectIds] = useState<string[] | null>(null);
-  const [selectedStatuses, setSelectedStatuses] = useState<StatutTache[] | null>(null);
+  // Filtres et Recherche Multi-Sélection (avec persistance par Projet et Vue)
+  const [selectedProjectIdsState, setSelectedProjectIdsState] = useState<string[] | null>(null);
+
+  // Charger le dernier projet sélectionné de l'espace actif au changement d'espace
+  useEffect(() => {
+    try {
+      const savedProject = localStorage.getItem(`pmo_last_selected_project_${activeSpaceId}`);
+      if (savedProject) {
+        setSelectedProjectIdsState(JSON.parse(savedProject));
+      } else {
+        setSelectedProjectIdsState(null);
+      }
+    } catch (err) {
+      console.error('Erreur chargement dernier projet sélectionné:', err);
+      setSelectedProjectIdsState(null);
+    }
+  }, [activeSpaceId]);
+
+  // Sauvegarder le dernier projet sélectionné pour l'espace actif dès qu'il change
+  useEffect(() => {
+    if (!activeSpaceId) return;
+    // Vérifier si le projet sélectionné appartient bien à l'espace courant, ou s'il est global (null)
+    // Cela évite d'enregistrer un projet d'un ancien espace dans le nouvel espace lors de la transition.
+    const isValidProjectForSpace = !selectedProjectIdsState || selectedProjectIdsState.every(id => 
+      projects.some(p => p.id === id && (p.spaceId || 'default') === activeSpaceId)
+    );
+
+    if (!isValidProjectForSpace) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(`pmo_last_selected_project_${activeSpaceId}`, JSON.stringify(selectedProjectIdsState));
+    } catch (err) {
+      console.error('Erreur sauvegarde dernier projet sélectionné:', err);
+    }
+  }, [selectedProjectIdsState, activeSpaceId, projects]);
+
+  const activeProjectIdForStorage = useMemo(() => {
+    if (selectedProjectIdsState && selectedProjectIdsState.length === 1) {
+      return selectedProjectIdsState[0];
+    }
+    return 'global';
+  }, [selectedProjectIdsState]);
+
+  const defaultActiveFilters = useMemo(() => {
+    return {
+      searchQuery: '',
+      selectedProjectIds: selectedProjectIdsState,
+      selectedStatuses: null as StatutTache[] | null,
+    };
+  }, [selectedProjectIdsState]);
+
+  const {
+    filters: activeFilters,
+    updateFilters: updateActiveFilters,
+    resetFilters: resetActiveFilters,
+  } = useTaskFiltersPersist('active', activeProjectIdForStorage, defaultActiveFilters, activeSpaceId);
+
+  // Valeurs synchronisées exposées au reste de l'application
+  const searchQuery = activeFilters.searchQuery;
+  const selectedProjectIds = activeFilters.selectedProjectIds;
+  const selectedStatuses = activeFilters.selectedStatuses;
+
+  const setSearchQuery = (val: string) => updateActiveFilters({ searchQuery: val });
+  const setSelectedProjectIds = (val: string[] | null) => {
+    setSelectedProjectIdsState(val);
+    updateActiveFilters({ selectedProjectIds: val });
+  };
+  const setSelectedStatuses = (val: StatutTache[] | null) => updateActiveFilters({ selectedStatuses: val });
 
   // Modales Tâche et Projet
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -167,6 +236,22 @@ export default function App() {
     month: new Date().getMonth() + 1,
   });
   const [timesheetEntriesForReport, setTimesheetEntriesForReport] = useState<TimeEntry[]>([]);
+  const [allTimesheets, setAllTimesheets] = useState<TimeEntry[]>([]);
+
+  // Charger toutes les imputations pour les besoins du reporting / dashboard
+  useEffect(() => {
+    if (!user) {
+      setAllTimesheets([]);
+      return;
+    }
+    fetchAllTimeEntries(user.uid, activeSpaceId)
+      .then((data) => {
+        setAllTimesheets(data);
+      })
+      .catch((err) => {
+        console.error('Erreur de chargement de toutes les imputations pour analytics:', err);
+      });
+  }, [user, activeSpaceId, currentView]);
 
   const handleOpenTimesheetReport = async (year: number, month: number) => {
     if (!user) return;
@@ -211,6 +296,9 @@ export default function App() {
 
   // Modale Motif Bloqué (Règle 4)
   const [blockedModalTask, setBlockedModalTask] = useState<Tache | null>(null);
+
+  // Modale Motif Annulé
+  const [cancellationModalTask, setCancellationModalTask] = useState<Tache | null>(null);
 
   // Modale de confirmation réutilisable
   const [confirmModalConfig, setConfirmModalConfig] = useState<{
@@ -534,10 +622,6 @@ export default function App() {
     if (user?.uid) {
       saveActiveSpaceId(user.uid, spaceId);
     }
-    // Réinitialisation des filtres locaux lors d'un changement d'espace pour un affichage propre
-    setSelectedProjectIds(null);
-    setSelectedStatuses(null);
-    setSearchQuery('');
     const targetSpace = spaces.find((s) => s.id === spaceId);
     if (targetSpace) {
       showToast(`Espace « ${targetSpace.nom} » activé.`);
@@ -546,9 +630,8 @@ export default function App() {
 
   // Réinitialisation rapide de tous les filtres
   const handleResetFilters = () => {
-    setSearchQuery('');
-    setSelectedProjectIds(null);
-    setSelectedStatuses(null);
+    resetActiveFilters();
+    setSelectedProjectIdsState(null);
   };
 
   // Enregistrer (Créer ou Modifier) un espace de travail
@@ -683,8 +766,8 @@ export default function App() {
       return true;
     });
 
-    const activeTasks = filtered.filter((t) => t.statut !== 'Done');
-    const doneTasks = filtered.filter((t) => t.statut === 'Done');
+    const activeTasks = filtered.filter((t) => t.statut !== 'Done' && t.statut !== 'Cancelled');
+    const doneTasks = filtered.filter((t) => t.statut === 'Done' || t.statut === 'Cancelled');
 
     activeTasks.sort((a, b) => a.ordre - b.ordre);
     doneTasks.sort((a, b) => a.ordre - b.ordre);
@@ -698,6 +781,11 @@ export default function App() {
 
     if (newStatus === 'Blocked') {
       setBlockedModalTask(task);
+      return;
+    }
+
+    if (newStatus === 'Cancelled') {
+      setCancellationModalTask(task);
       return;
     }
 
@@ -718,6 +806,10 @@ export default function App() {
     let updatedTask = updateTaskStatus(task, 'Open', {
       newOrdre,
     });
+    // Nettoyer la raison d'annulation éventuelle si on réouvre la tâche
+    if (updatedTask.cancellationReason) {
+      delete updatedTask.cancellationReason;
+    }
     updatedTask = {
       ...updatedTask,
       userId: user?.uid || task.userId,
@@ -740,7 +832,12 @@ export default function App() {
     }
   };
 
-  const applyStatusChange = (taskId: string, newStatus: StatutTache, additionalComment?: string) => {
+  const applyStatusChange = (
+    taskId: string,
+    newStatus: StatutTache,
+    additionalComment?: string,
+    cancellationReason?: string
+  ) => {
     const target = tasks.find((t) => t.id === taskId);
     if (!target) return;
 
@@ -753,7 +850,7 @@ export default function App() {
       });
     }
 
-    const isNowDone = newStatus === 'Done';
+    const isNowDone = newStatus === 'Done' || newStatus === 'Cancelled';
 
     let newOrdre = target.ordre;
     if (isNowDone) {
@@ -765,6 +862,19 @@ export default function App() {
     let updatedTask = updateTaskStatus(target, newStatus, {
       newOrdre,
     });
+
+    // En cas d'annulation, on sauvegarde la raison et on garde dateRealisation
+    if (newStatus === 'Cancelled') {
+      updatedTask.dateRealisation = new Date().toISOString();
+      if (cancellationReason && cancellationReason.trim() !== '') {
+        updatedTask.cancellationReason = cancellationReason.trim();
+      } else {
+        delete updatedTask.cancellationReason;
+      }
+    } else if (newStatus === 'Done') {
+      delete updatedTask.cancellationReason;
+    }
+
     updatedTask = {
       ...updatedTask,
       userId: user?.uid || target.userId,
@@ -781,6 +891,8 @@ export default function App() {
 
     if (newStatus === 'Done') {
       showToast('Tâche marquée comme terminée.');
+    } else if (newStatus === 'Cancelled') {
+      showToast('Tâche marquée comme annulée.');
     } else if (newStatus === 'Blocked') {
       showToast('Tâche marquée comme bloquée avec motif.');
     } else if (newStatus === 'Backlog' || (newStatus as string) === 'backlog') {
@@ -795,6 +907,14 @@ export default function App() {
     if (!blockedModalTask) return;
     applyStatusChange(blockedModalTask.id, 'Blocked', `Bloqué : ${reason}`);
     setBlockedModalTask(null);
+  };
+
+  // Validation du motif d'annulation
+  const handleConfirmCancellationReason = (reason: string) => {
+    if (!cancellationModalTask) return;
+    const comment = reason.trim() !== '' ? `Annulé : ${reason}` : 'Tâche annulée.';
+    applyStatusChange(cancellationModalTask.id, 'Cancelled', comment, reason);
+    setCancellationModalTask(null);
   };
 
   // Ajout direct de commentaire à une tâche avec mise à jour automatique de lastActivityAt
@@ -1601,6 +1721,16 @@ export default function App() {
             tasks={currentSpaceTasks}
             projects={currentSpaceProjects}
             onReopenTask={handleReopenTask}
+            activeSpaceId={currentSpace.id}
+          />
+        ) : currentView === 'analytics' ? (
+          <AnalyticsReportingView
+            tasks={tasks}
+            projects={projects}
+            timesheets={allTimesheets}
+            activeSpaceId={currentSpace.id}
+            activeSpaceName={currentSpace.nom}
+            onNavigateToTab={setCurrentView}
           />
         ) : (
           /* PANNEAU DAILY REPORT DE L'ESPACE ACTIF (Exclut le Backlog) */
@@ -1659,6 +1789,14 @@ export default function App() {
         task={blockedModalTask}
         onConfirm={handleConfirmBlockedReason}
         onCancel={() => setBlockedModalTask(null)}
+      />
+
+      {/* MODALE MOTIF D'ANNULATION */}
+      <CancellationReasonModal
+        isOpen={!!cancellationModalTask}
+        task={cancellationModalTask}
+        onConfirm={handleConfirmCancellationReason}
+        onCancel={() => setCancellationModalTask(null)}
       />
 
       {/* MODALE GESTION DES PROJETS DE L'ESPACE ACTIF */}

@@ -9,6 +9,7 @@ import {
   Edit3,
   ChevronDown,
   AlertTriangle,
+  AlertCircle,
   Send,
   ArrowRight,
   Inbox,
@@ -92,6 +93,13 @@ export const VIBRANT_STATUS_CONFIG: Record<
     border: 'border-emerald-600',
     dot: 'bg-white',
   },
+  Cancelled: {
+    label: 'Annulé',
+    bg: 'bg-rose-500',
+    text: 'text-white font-medium',
+    border: 'border-rose-600',
+    dot: 'bg-white',
+  },
 };
 
 // PALETTE DYNAMIQUE SATURÉE POUR LES PROJETS
@@ -152,8 +160,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const handleDelete = onRequestDelete || onDelete || (() => {});
 
   const isDone = task.statut === 'Done';
+  const isCancelled = task.statut === 'Cancelled';
   const isBacklog = (task.statut as string)?.toLowerCase() === 'backlog';
-  const isOverdue = !isDone && isTaskOverdue(task);
+  const isOverdue = !isDone && !isCancelled && isTaskOverdue(task);
   const statusCfg = VIBRANT_STATUS_CONFIG[task.statut] || VIBRANT_STATUS_CONFIG['Open'];
 
   // Style de pastille projet dynamique
@@ -229,7 +238,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           : isExpanded
           ? 'border-slate-300 ring-1 ring-slate-200 shadow-sm'
           : 'border-slate-200 hover:border-slate-300 hover:shadow-sm'
-      } ${isDone ? 'opacity-65 bg-slate-50/70' : ''}`}
+      } ${isDone || isCancelled ? 'opacity-65 bg-slate-50/70' : ''}`}
     >
       {/* LIGNE PRINCIPALE DE LA CARTE */}
       <div
@@ -290,11 +299,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           <h4
             id={`task-title-${task.id}`}
             className={`text-sm font-medium tracking-tight transition-colors duration-200 truncate leading-snug ${
-              isDone
+              isDone || isCancelled
                 ? 'line-through text-slate-400'
                 : 'text-slate-900 group-hover:text-black'
             }`}
-            title={task.titre}
+            title={task.cancellationReason ? `${task.titre} (Motif : ${task.cancellationReason})` : task.titre}
           >
             {task.titre}
           </h4>
@@ -308,13 +317,14 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 handleStatusChange(task, e.target.value as StatutTache);
               }}
               className={`rounded-lg border px-2.5 py-0.5 text-xs cursor-pointer transition-all duration-200 focus:outline-none shadow-2xs ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
-              title="Modifier le statut"
+              title={task.cancellationReason ? `Motif d'annulation : ${task.cancellationReason}` : "Modifier le statut"}
             >
               <option value="Backlog" className="bg-white text-purple-700 font-semibold">Backlog</option>
               <option value="Open" className="bg-white text-sky-600 font-medium">À Faire</option>
               <option value="In Progress" className="bg-white text-amber-900 font-semibold">En Cours</option>
               <option value="Blocked" className="bg-white text-red-600 font-bold">Bloqué</option>
               <option value="Done" className="bg-white text-emerald-600 font-medium">Terminé</option>
+              <option value="Cancelled" className="bg-white text-rose-600 font-medium">Annulé</option>
             </select>
           </div>
 
@@ -513,6 +523,19 @@ export const TaskCard: React.FC<TaskCardProps> = ({
               </p>
             )}
           </div>
+
+          {/* Raison d'annulation (si renseignée) */}
+          {task.cancellationReason && (
+            <div>
+              <h5 className="text-xs font-semibold uppercase tracking-wider text-rose-600 mb-1.5 flex items-center gap-1">
+                <AlertCircle className="h-3.5 w-3.5 text-rose-500" />
+                Raison de l&apos;annulation
+              </h5>
+              <p className="text-xs text-rose-950 leading-relaxed whitespace-pre-wrap font-normal bg-rose-50/50 p-3 rounded-xl border border-rose-200 shadow-2xs">
+                {task.cancellationReason}
+              </p>
+            </div>
+          )}
 
           {/* Horodatages d'activité */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 pt-2 border-t border-slate-200">

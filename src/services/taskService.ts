@@ -195,7 +195,7 @@ export function updateTaskDetails(
 ): Tache {
   const nowIso = new Date().toISOString();
   const nextStatus = data.statut || task.statut;
-  const isNowDone = nextStatus === 'Done';
+  const isNowDone = nextStatus === 'Done' || nextStatus === 'Cancelled';
   const dateRealisation = isNowDone
     ? task.dateRealisation || nowIso
     : null;
@@ -227,7 +227,7 @@ export function updateTaskStatus(
   }
 ): Tache {
   const nowIso = new Date().toISOString();
-  const isNowDone = newStatus === 'Done';
+  const isNowDone = newStatus === 'Done' || newStatus === 'Cancelled';
   const dateRealisation = isNowDone
     ? task.dateRealisation || nowIso
     : null;
@@ -318,7 +318,7 @@ export function createNewTask(params: {
     projetId: params.projetId ?? null,
     statut,
     dateEcheance: params.dateEcheance || null,
-    dateRealisation: statut === 'Done' ? nowIso : null,
+    dateRealisation: (statut === 'Done' || statut === 'Cancelled') ? nowIso : null,
     createdAt: nowIso,
     updatedAt: nowIso,
     lastActivityAt: nowIso,

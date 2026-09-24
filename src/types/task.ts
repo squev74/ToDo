@@ -1,4 +1,4 @@
-export type StatutTache = 'Backlog' | 'Open' | 'In Progress' | 'Blocked' | 'Done' | 'backlog';
+export type StatutTache = 'Backlog' | 'Open' | 'In Progress' | 'Blocked' | 'Done' | 'Cancelled' | 'backlog';
 
 export interface Commentaire {
   id: string;
@@ -16,7 +16,8 @@ export interface Tache {
   jiraKey?: string; // Clé JIRA associée (ex: 'EVOLIT-24')
   statut: StatutTache;
   dateEcheance?: string | null; // Format YYYY-MM-DD
-  dateRealisation: string | null; // Horodatage ISO automatique quand statut passe à 'Done'
+  dateRealisation: string | null; // Horodatage ISO automatique quand statut passe à 'Done' ou 'Cancelled'
+  cancellationReason?: string; // Motif optionnel d'annulation
   dateModification?: string; // Horodatage ISO quand la tâche ou son statut est modifié
   createdAt?: string; // Horodatage ISO de création
   updatedAt?: string; // Horodatage ISO de dernière mise à jour

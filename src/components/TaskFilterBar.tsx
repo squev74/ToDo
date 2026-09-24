@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Tache, Projet, StatutTache } from '../types';
 
-export const ALL_STATUSES: StatutTache[] = ['Open', 'In Progress', 'Blocked', 'Done'];
+export const ALL_STATUSES: StatutTache[] = ['Open', 'In Progress', 'Blocked', 'Done', 'Cancelled'];
 
 export const STATUS_CONFIG: Record<
   StatutTache,
@@ -77,6 +77,14 @@ export const STATUS_CONFIG: Record<
     borderClass: 'border-emerald-600',
     dotClass: 'bg-white',
     icon: CheckCircle2,
+  },
+  Cancelled: {
+    label: 'Annulé',
+    bgClass: 'bg-rose-500',
+    textClass: 'text-white font-medium',
+    borderClass: 'border-rose-600',
+    dotClass: 'bg-white',
+    icon: AlertCircle,
   },
 };
 
@@ -168,6 +176,7 @@ export const TaskFilterBar: React.FC<TaskFilterBarProps> = ({
       'In Progress': 0,
       Blocked: 0,
       Done: 0,
+      Cancelled: 0,
     };
     tasks.forEach((t) => {
       if (counts[t.statut] !== undefined) {
@@ -540,12 +549,12 @@ export const TaskFilterBar: React.FC<TaskFilterBarProps> = ({
               id="reset-filters-btn"
               type="button"
               onClick={onResetFilters}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-[#C89B7B]/30 bg-[#C89B7B]/15 px-2.5 py-1.5 text-xs font-medium text-[#966847] hover:bg-[#C89B7B]/25 transition-colors duration-300 shadow-none"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#C89B7B]/25 bg-white hover:bg-[#F9F8F6] px-3 py-1.5 text-xs font-normal text-[#966847] hover:text-[#7f5434] transition-all duration-200 cursor-pointer shadow-xs hover:shadow-sm"
               title="Réinitialiser tous les filtres"
             >
-              <RotateCcw className="h-3.5 w-3.5 text-[#966847]" />
-              <span>Réinitialiser</span>
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#966847]/20 text-[10px] font-medium text-[#966847]">
+              <RotateCcw className="h-3 w-3 text-[#966847]" />
+              <span className="font-light">Réinitialiser les filtres</span>
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[#C89B7B]/10 text-[10px] font-semibold text-[#966847] ml-0.5 font-mono">
                 {activeFiltersCount}
               </span>
             </button>

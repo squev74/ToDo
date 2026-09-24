@@ -1,4 +1,4 @@
-export type StatutTache = 'Backlog' | 'Open' | 'In Progress' | 'Blocked' | 'Done' | 'backlog';
+export type StatutTache = 'Backlog' | 'Open' | 'In Progress' | 'Blocked' | 'Done' | 'Cancelled' | 'backlog';
 
 export const ADMIN_EMAIL = 'squeva11@gmail.com';
 export const ADMIN_UID = 'G1Dm03dHRvPelWT8c2ydqXLC1Y93';
@@ -43,7 +43,8 @@ export interface Tache {
   jiraKey?: string; // Clé JIRA associée (ex: 'EVOLIT-24')
   statut: StatutTache;
   dateEcheance?: string | null; // Format YYYY-MM-DD
-  dateRealisation: string | null; // Horodatage ISO automatique quand statut passe à 'Done'
+  dateRealisation: string | null; // Horodatage ISO automatique quand statut passe à 'Done' ou 'Cancelled'
+  cancellationReason?: string; // Motif optionnel d'annulation
   dateModification?: string; // Horodatage ISO quand la tâche ou son statut est modifié
   createdAt?: string; // Horodatage ISO de création
   updatedAt?: string; // Horodatage ISO de dernière mise à jour
@@ -85,4 +86,6 @@ export interface AppDataExport {
 }
 
 export * from './types/recurringTask';
+import { TimeEntry, TimesheetConfig } from './types/timesheet';
+export type { TimeEntry, TimesheetConfig };
 

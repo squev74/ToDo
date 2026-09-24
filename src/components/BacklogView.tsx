@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useTaskFiltersPersist } from '../hooks/useTaskFiltersPersist';
 import {
   Inbox,
   Plus,
@@ -35,8 +36,70 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
   onOpenCreateModal,
   onReorderTasks,
 }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProjectFilter, setSelectedProjectFilter] = useState('all');
+  // Backlog state isolation and persistence
+  const [projectFilterState, setProjectFilterState] = useState('all');
+
+  // Charger le dernier projet du backlog au changement d'espace
+  useEffect(() => {
+    if (!activeSpace?.id) return;
+    try {
+      const saved = localStorage.getItem(`pmo_last_backlog_project_${activeSpace.id}`);
+      setProjectFilterState(saved || 'all');
+    } catch (err) {
+      console.error('Erreur chargement projet backlog:', err);
+      setProjectFilterState('all');
+    }
+  }, [activeSpace?.id]);
+
+  // Sauvegarder le dernier projet du backlog dès qu'il change
+  useEffect(() => {
+    if (!activeSpace?.id) return;
+
+    // Vérifier si le projet sélectionné appartient bien à l'espace courant, ou s'il est global (all/none)
+    const isValidProject = projectFilterState === 'all' || projectFilterState === 'none' || 
+      projects.some(p => p.id === projectFilterState && (p.spaceId || 'default') === activeSpace.id);
+
+    if (!isValidProject) {
+      return;
+    }
+
+    try {
+      localStorage.setItem(`pmo_last_backlog_project_${activeSpace.id}`, projectFilterState);
+    } catch (err) {
+      console.error('Erreur sauvegarde projet backlog:', err);
+    }
+  }, [projectFilterState, activeSpace?.id, projects]);
+
+  const resolvedProjectIdForStorage = useMemo(() => {
+    if (projectFilterState && projectFilterState !== 'all' && projectFilterState !== 'none') {
+      return projectFilterState;
+    }
+    return 'global';
+  }, [projectFilterState]);
+
+  const defaultBacklogFilters = useMemo(() => {
+    return {
+      searchQuery: '',
+      selectedProjectFilter: projectFilterState,
+      selectedStatuses: ['Backlog'] as StatutTache[],
+    };
+  }, [projectFilterState]);
+
+  const {
+    filters: backlogFilters,
+    updateFilters: updateBacklogFilters,
+    resetFilters: resetBacklogFilters,
+  } = useTaskFiltersPersist('backlog', resolvedProjectIdForStorage, defaultBacklogFilters, activeSpace?.id);
+
+  // Synchronized values
+  const searchQuery = backlogFilters.searchQuery;
+  const selectedProjectFilter = backlogFilters.selectedProjectFilter;
+
+  const setSearchQuery = (val: string) => updateBacklogFilters({ searchQuery: val });
+  const setSelectedProjectFilter = (val: string) => {
+    setProjectFilterState(val);
+    updateBacklogFilters({ selectedProjectFilter: val });
+  };
   const [quickTitle, setQuickTitle] = useState('');
   const [quickProjectId, setQuickProjectId] = useState<string>('');
 
@@ -281,13 +344,14 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
               id="backlog-reset-filters-btn"
               type="button"
               onClick={() => {
-                setSearchQuery('');
-                setSelectedProjectFilter('all');
+                resetBacklogFilters();
+                setProjectFilterState('all');
               }}
-              className="inline-flex items-center gap-1 text-xs text-[#737873] hover:text-[#1A1D1A] font-medium self-start sm:self-center transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#C89B7B]/25 bg-white hover:bg-[#F9F8F6] px-3 py-1 text-xs font-normal text-[#966847] hover:text-[#7f5434] transition-all duration-200 cursor-pointer shadow-xs"
+              title="Réinitialiser tous les filtres"
             >
-              <RotateCcw className="h-3 w-3" />
-              <span>Réinitialiser</span>
+              <RotateCcw className="h-3 w-3 text-[#966847]" />
+              <span className="font-light text-[11px]">Réinitialiser les filtres</span>
             </button>
           )}
         </div>

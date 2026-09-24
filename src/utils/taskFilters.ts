@@ -17,7 +17,7 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 export function getActiveTasks(tasks: Task[]): Task[] {
   const now = Date.now();
   return tasks.filter((task) => {
-    if (task.statut !== 'Done') {
+    if (task.statut !== 'Done' && task.statut !== 'Cancelled') {
       return true;
     }
     if (!task.dateRealisation) {
@@ -38,7 +38,7 @@ export function getArchivedTasks(tasks: Task[], filters: ArchiveFilters): Task[]
   const now = Date.now();
 
   const baseArchived = tasks.filter((task) => {
-    if (task.statut !== 'Done') {
+    if (task.statut !== 'Done' && task.statut !== 'Cancelled') {
       return false;
     }
     if (!task.dateRealisation) {
@@ -74,12 +74,13 @@ export function getArchivedTasks(tasks: Task[], filters: ArchiveFilters): Task[]
       }
     }
 
-    // Recherche textuelle multi-champs
+    // Recherche textuelle multi-champs (incluant la raison d'annulation)
     if (filters.searchQuery) {
       const q = filters.searchQuery.toLowerCase().trim();
       const titleMatch = task.titre?.toLowerCase().includes(q);
       const descMatch = task.description?.toLowerCase().includes(q);
-      if (!titleMatch && !descMatch) {
+      const reasonMatch = task.cancellationReason?.toLowerCase().includes(q);
+      if (!titleMatch && !descMatch && !reasonMatch) {
         return false;
       }
     }

@@ -94,6 +94,45 @@ export async function fetchMonthTimeEntries(
 }
 
 /**
+ * Récupère l'ensemble des saisies de temps pour un espace de travail donné (sans filtre de mois).
+ * @param userId ID de l'utilisateur
+ * @param spaceId ID de l'espace de travail
+ */
+export async function fetchAllTimeEntries(
+  userId: string,
+  spaceId: string
+): Promise<TimeEntry[]> {
+  const path = `users/${userId}/timeEntries`;
+  try {
+    const collRef = collection(db, 'users', userId, 'timeEntries');
+    const snapshot = await getDocs(collRef);
+    const entries: TimeEntry[] = [];
+    
+    snapshot.forEach((doc) => {
+      const data = doc.data();
+      if (data.spaceId === spaceId) {
+        entries.push({
+          id: doc.id,
+          userId: data.userId,
+          spaceId: data.spaceId,
+          taskId: data.taskId,
+          jiraKey: data.jiraKey,
+          projectName: data.projectName,
+          date: data.date,
+          hours: Number(data.hours),
+          comment: data.comment || '',
+        });
+      }
+    });
+
+    return entries;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.LIST, path, userId);
+    return [];
+  }
+}
+
+/**
  * Génère un identifiant de document sûr pour Firestore, en évitant les slashs
  * qui créent des segments de chemin invalides.
  */

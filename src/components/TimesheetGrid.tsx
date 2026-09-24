@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Clock,
   AlertTriangle,
@@ -74,6 +74,34 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
     hours: number;
     comment: string;
   } | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const todayColRef = useRef<HTMLTableHeaderCellElement>(null);
+
+  // Vérifier si le mois/année sélectionné correspond au mois/année courant
+  const isCurrentMonth = useMemo(() => {
+    const today = new Date();
+    return today.getFullYear() === currentYear && today.getMonth() + 1 === currentMonth;
+  }, [currentYear, currentMonth]);
+
+  // Centrage automatique et instantané sur la date du jour
+  useEffect(() => {
+    if (loading) return; // Attendre que le chargement du DOM soit terminé
+    
+    const timer = setTimeout(() => {
+      if (isCurrentMonth && containerRef.current && todayColRef.current) {
+        const container = containerRef.current;
+        const todayElement = todayColRef.current;
+        
+        const scrollLeft = todayElement.offsetLeft - (container.clientWidth / 2) + (todayElement.clientWidth / 2);
+        container.scrollTo({ left: scrollLeft, behavior: 'instant' as any });
+      } else if (containerRef.current) {
+        containerRef.current.scrollLeft = 0;
+      }
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [currentYear, currentMonth, isCurrentMonth, loading]);
 
   // Charger les entrées de temps et la configuration des projets au changement de mois / année / espace
   const loadEntriesAndConfig = async () => {
@@ -644,7 +672,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
             <span className="text-xs">Chargement de votre feuille de temps...</span>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div ref={containerRef} className="overflow-x-auto">
             <table className="w-full text-left border-collapse table-fixed min-w-[1600px]">
               {/* EN-TÊTE DU TABLEAU */}
               <thead>
@@ -652,17 +680,25 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
                   <th className="p-3 text-xs font-medium text-[#737873] tracking-wider w-[220px] sticky left-0 bg-[#F9F8F6] z-10 border-r border-[#F0EFEB]">
                     Projets (Clé JIRA)
                   </th>
-                  {daysList.map((d) => (
-                    <th
-                      key={d.day}
-                      className={`p-2 text-center text-[10px] font-medium border-r border-[#F0EFEB] ${
-                        d.isWeekend ? 'bg-slate-100 text-[#737873]/50' : 'text-[#737873]'
-                      }`}
-                    >
-                      <div className="font-bold uppercase">{d.dayName}</div>
-                      <div className="text-xs mt-0.5">{d.day}</div>
-                    </th>
-                  ))}
+                  {daysList.map((d) => {
+                    const isToday = isCurrentMonth && d.day === new Date().getDate();
+                    return (
+                      <th
+                        key={d.day}
+                        ref={isToday ? todayColRef : null}
+                        className={`p-2 text-center text-[10px] font-medium border-r border-[#F0EFEB] ${
+                          isToday
+                            ? 'bg-indigo-50 text-indigo-900 ring-2 ring-inset ring-indigo-300'
+                            : d.isWeekend
+                            ? 'bg-slate-100 text-[#737873]/50'
+                            : 'text-[#737873]'
+                        }`}
+                      >
+                        <div className="font-bold uppercase">{d.dayName}</div>
+                        <div className="text-xs mt-0.5">{d.day}</div>
+                      </th>
+                    );
+                  })}
                   <th className="p-3 text-center text-xs font-medium text-[#737873] tracking-wider w-[80px] border-l border-[#F0EFEB] bg-[#F9F8F6]">
                     Total
                   </th>
@@ -698,11 +734,17 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
                         const hasComment = !!cellData?.comment;
                         const isSaving = savingCell === cellKey;
 
+                        const isCellToday = isCurrentMonth && d.day === new Date().getDate();
+
                         return (
                           <td
                             key={d.day}
                             className={`p-1 border-r border-[#F0EFEB] relative ${
-                              d.isWeekend ? 'bg-slate-100/30' : ''
+                              isCellToday
+                                ? 'bg-indigo-50/25 ring-1 ring-inset ring-indigo-200/30'
+                                : d.isWeekend
+                                ? 'bg-slate-100/30'
+                                : ''
                             }`}
                           >
                             {/* Petit coin supérieur droit coloré si commentaire existant (style Excel) */}
