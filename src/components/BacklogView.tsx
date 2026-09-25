@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { Tache, Projet, Espace, StatutTache } from '../types';
 import { TaskCard } from './TaskCard';
+import { AiBacklogPrioritizer } from './AiBacklogPrioritizer';
 
 export interface BacklogViewProps {
   tasks: Tache[];
@@ -241,6 +242,9 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {activeSpace && (
+              <AiBacklogPrioritizer tasks={tasks} projects={projects} spaceId={activeSpace.id} />
+            )}
             <button
               id="backlog-open-create-modal-btn"
               type="button"

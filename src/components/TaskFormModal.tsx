@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Calendar, Folder, Tag, AlertCircle } from 'lucide-react';
 import { Tache, Projet, StatutTache } from '../types';
+import { AiTaskRefiner } from './AiTaskRefiner';
 
 interface TaskFormModalProps {
   isOpen: boolean;
@@ -139,6 +140,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
               className="w-full rounded-xl border border-[#F0EFEB] bg-[#F9F8F6] px-3.5 py-2 text-sm text-[#1A1D1A] placeholder:text-[#737873]/60 focus:border-[#6B8E78] focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
               autoFocus
             />
+            <AiTaskRefiner currentValue={titre} onApplyRefinement={setTitre} />
           </div>
 
           <div>

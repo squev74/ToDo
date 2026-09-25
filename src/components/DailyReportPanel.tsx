@@ -15,6 +15,7 @@ import {
 import { Tache, Projet, Espace } from '../types';
 import { getTodayDateString } from '../utils/storage';
 import { getWorkspaceIconComponent } from '../utils/workspaceIcons';
+import { EmailInboxAlert } from './EmailInboxAlert';
 
 interface DailyReportPanelProps {
   tasks: Tache[];
@@ -39,8 +40,27 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
   const todayStr = useMemo(() => getTodayDateString(), []);
   const ActiveSpaceIcon = activeSpace ? getWorkspaceIconComponent(activeSpace.icone) : null;
 
-  // Plage de dates : Date de début et Date de fin
-  const [startDate, setStartDate] = useState<string>(todayStr);
+  // Plage de dates : Date de début (jour ouvré d'avant aujourd'hui) et Date de fin (aujourd'hui)
+  const [startDate, setStartDate] = useState<string>(() => {
+    const now = new Date();
+    // Reculer d'un jour d'abord
+    now.setDate(now.getDate() - 1);
+    
+    // Dimanche (0) -> reculer à Vendredi (-2 jours)
+    if (now.getDay() === 0) {
+      now.setDate(now.getDate() - 2);
+    }
+    // Samedi (6) -> reculer à Vendredi (-1 jour)
+    else if (now.getDay() === 6) {
+      now.setDate(now.getDate() - 1);
+    }
+    
+    // Formater au format YYYY-MM-DD
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  });
   const [endDate, setEndDate] = useState<string>(todayStr);
   const [copiedSummary, setCopiedSummary] = useState<boolean>(false);
 
@@ -561,6 +581,11 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Alerte dynamique d'emails non classés (Zero Inbox) */}
+      {activeSpace && (
+        <EmailInboxAlert spaceId={activeSpace.id} spaceName={activeSpace.nom} />
+      )}
 
       {/* Grille des volets du rapport */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
