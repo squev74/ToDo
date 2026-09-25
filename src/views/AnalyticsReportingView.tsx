@@ -26,6 +26,7 @@ interface AnalyticsReportingViewProps {
   activeSpaceId: string;
   activeSpaceName: string;
   onNavigateToTab?: (tab: 'tasks' | 'backlog' | 'timesheet' | 'archives') => void;
+  userName?: string; // Nom de l'intervenant filtré (ex: "Sylvain")
 }
 
 export const AnalyticsReportingView: React.FC<AnalyticsReportingViewProps> = ({
@@ -34,7 +35,8 @@ export const AnalyticsReportingView: React.FC<AnalyticsReportingViewProps> = ({
   timesheets = [],
   activeSpaceId,
   activeSpaceName,
-  onNavigateToTab
+  onNavigateToTab,
+  userName = 'Sylvain'
 }) => {
   // 1. Isoler et filtrer les données par espace courant
   const currentSpaceTasks = useMemo(() => tasks.filter(t => t.spaceId === activeSpaceId), [tasks, activeSpaceId]);
@@ -46,8 +48,8 @@ export const AnalyticsReportingView: React.FC<AnalyticsReportingViewProps> = ({
 
   // 3. Calculer les métriques de capacité vs feuille de temps réelle
   const capacityMetrics = useMemo(() => {
-    return buildCapacityVsTimesheetMetrics(projects, timesheets, activeSpaceId, tasks);
-  }, [projects, timesheets, activeSpaceId, tasks]);
+    return buildCapacityVsTimesheetMetrics(projects, timesheets, activeSpaceId, tasks, userName);
+  }, [projects, timesheets, activeSpaceId, tasks, userName]);
 
   // 4. Calculer la vélocité mensuelle (Derniers 6 mois)
   const velocityData = useMemo(() => {
@@ -200,7 +202,7 @@ export const AnalyticsReportingView: React.FC<AnalyticsReportingViewProps> = ({
 
         {/* Capacitaire vs Réel (5 colonnes sur lg) */}
         <div className="lg:col-span-5">
-          <CapacityVsActualChart metrics={capacityMetrics} />
+          <CapacityVsActualChart metrics={capacityMetrics} userName={userName} />
         </div>
       </div>
 

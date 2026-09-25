@@ -101,7 +101,7 @@ import { GlobalPmoAttentionWidget } from './components/GlobalPmoAttentionWidget'
 import { ProjectHealthCheckBadge } from './components/ProjectHealthCheckBadge';
 
 export default function App() {
-  const { user, loading: authLoading, logout, isAdmin, isApproved } = useAuth();
+  const { user, loading: authLoading, logout, isAdmin, isApproved, userProfile } = useAuth();
 
   // Données strictement isolées par utilisateur
   const [spaces, setSpaces] = useState<Espace[]>(() => getDefaultSpaces());
@@ -252,6 +252,26 @@ export default function App() {
         console.error('Erreur de chargement de toutes les imputations pour analytics:', err);
       });
   }, [user, activeSpaceId, currentView]);
+
+  // Récupérer le nom d'intervenant pour la feuille de temps et le reporting de manière réactive
+  const [timesheetUserName, setTimesheetUserName] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(`timesheet_user_name_${activeSpaceId}`);
+      return saved || user?.displayName || user?.email?.split('@')[0] || 'Sylvain';
+    } catch {
+      return 'Sylvain';
+    }
+  });
+
+  // Mettre à jour si activeSpaceId ou user change
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`timesheet_user_name_${activeSpaceId}`);
+      setTimesheetUserName(saved || user?.displayName || user?.email?.split('@')[0] || 'Sylvain');
+    } catch {
+      // ignore
+    }
+  }, [activeSpaceId, user]);
 
   const handleOpenTimesheetReport = async (year: number, month: number) => {
     if (!user) return;
@@ -1698,7 +1718,7 @@ export default function App() {
               )}
             </div>
           </div>
-        ) : currentView === 'timesheet' ? (
+         ) : currentView === 'timesheet' ? (
           <TimesheetGrid
             userId={user.uid}
             spaceId={currentSpace.id}
@@ -1713,6 +1733,8 @@ export default function App() {
               handleUpdateProject(id, nom, existingColor, jiraKey);
             }}
             onOpenReportModal={handleOpenTimesheetReport}
+            userName={timesheetUserName}
+            onUserNameChange={setTimesheetUserName}
           />
         ) : currentView === 'knowledge' ? (
           <KnowledgeBaseView />
@@ -1731,6 +1753,7 @@ export default function App() {
             activeSpaceId={currentSpace.id}
             activeSpaceName={currentSpace.nom}
             onNavigateToTab={setCurrentView}
+            userName={timesheetUserName}
           />
         ) : (
           /* PANNEAU DAILY REPORT DE L'ESPACE ACTIF (Exclut le Backlog) */

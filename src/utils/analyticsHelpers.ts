@@ -136,16 +136,27 @@ function getMonthOverlapFraction(year: number, month: number, dateRange: string[
 
 /**
  * Aggrège le total d'heures réelles saisies (Timesheet) vs allouées (Plan Capacitaire)
- * pour chaque projet de l'espace sur la fenêtre des 100 derniers jours.
+ * pour un intervenant spécifique sur la fenêtre des 100 derniers jours.
  */
 export function buildCapacityVsTimesheetMetrics(
   projects: Projet[],
   timesheets: TimeEntry[],
   spaceId: string,
-  tasks: Task[] = []
+  tasks: Task[] = [],
+  userName: string = 'Sylvain'
 ): CapacityVsTimesheetMetric[] {
+  // 1. LOGS DE DIAGNOSTIC AUTOMATIQUES (Console)
+  console.log('[Timesheet Debug] Total entries received:', timesheets.length);
+  console.log('[Timesheet Debug] Sample entry:', timesheets[0]);
+
   const spaceProjects = projects.filter((p) => p.spaceId === spaceId);
-  const spaceTimesheets = timesheets.filter((t) => t.spaceId === spaceId);
+  
+  // Filtrage Espace (spaceId) : vérifier l'espace, mais ne pas rejeter si l'entrée n'a pas de spaceId explicite
+  const spaceTimesheets = timesheets.filter((t) => {
+    if (t.spaceId && t.spaceId !== spaceId) return false;
+    return true;
+  });
+
   const dateRange = get100DaysRange();
 
   // Déterminer les mois/années uniques présents dans les 100 jours
@@ -161,14 +172,64 @@ export function buildCapacityVsTimesheetMetrics(
     }
   });
 
-  return spaceProjects.map((project) => {
-    // 1. Calculer le réel saisi dans le Timesheet sur les 100 derniers jours
-    const projectTimesheets = spaceTimesheets.filter((entry) => {
-      if (!dateRange.includes(entry.date)) return false;
+  // Déterminer la date exacte d'il y a 100 jours
+  const todayDate = new Date();
 
-      // Correspondance par clé JIRA ou nom du projet ou tâche associée
-      const matchesJira = project.jiraKey && entry.jiraKey && project.jiraKey.toUpperCase().trim() === entry.jiraKey.toUpperCase().trim();
-      const matchesName = project.nom.toLowerCase().trim() === entry.projectName.toLowerCase().trim();
+  return spaceProjects.map((project) => {
+    // 1. Calculer le réel saisi dans le Timesheet sur les 100 derniers jours pour cet intervenant
+    const rawProjectTimesheets = spaceTimesheets.filter((entry) => {
+      // Filtrage Date (100 jours) : Parser la date de manière robuste et comparer le timestamp
+      if (entry.date) {
+        const entryDate = new Date(entry.date);
+        const hundredDaysAgoTime = todayDate.getTime() - 100 * 24 * 60 * 60 * 1000;
+        if (entryDate.getTime() < hundredDaysAgoTime) return false;
+      } else {
+        return false;
+      }
+
+      // Filtrage Nom (userName) : Nettoyer les chaînes, inclure par défaut si absent
+      const entryUser = (entry.userName || '').trim().toLowerCase();
+      const filterUser = (userName || '').trim().toLowerCase();
+
+      if (filterUser !== '' && entryUser !== '') {
+        const isExact = entryUser === filterUser;
+        const isPartial = entryUser.includes(filterUser) || filterUser.includes(entryUser);
+
+        if (!isExact && !isPartial) {
+          return false;
+        }
+      }
+
+      // Correspondance par clé JIRA ou nom du projet ou tâche associée (nettoyage et sensibilité à la casse)
+      const projectJira = (project.jiraKey || '').toUpperCase().trim();
+      const entryJira = (entry.jiraKey || '').toUpperCase().trim();
+      const projectNameLower = (project.nom || '').toLowerCase().trim();
+      const entryProjectNameLower = (entry.projectName || '').toLowerCase().trim();
+
+      // Règle 1: Exclure les entrées de projets supprimés (non présents dans spaceProjects)
+      if (entryJira !== '') {
+        const isProjActive = spaceProjects.some((p) => {
+          const pJira = (p.jiraKey || '').toUpperCase().trim();
+          return entryJira === p.id || (pJira !== '' && entryJira === pJira);
+        });
+        if (!isProjActive) {
+          // Projet supprimé / orphelin -> on l'ignore d'office
+          return false;
+        }
+      }
+
+      // Règle 2: Si l'entrée indique une clé de projet, elle doit correspondre à CE projet en cours de traitement
+      if (entryJira !== '') {
+        const isCurrentProject = entryJira === project.id || (projectJira !== '' && entryJira === projectJira);
+        if (!isCurrentProject) {
+          return false;
+        }
+      }
+
+      // Associer les heures si entry.projectId === project.id OR entry.projectName === project.name (ou project.nom)
+      const matchesProjectId = (entry as any).projectId && (entry as any).projectId === project.id;
+      const matchesJira = projectJira !== '' && entryJira !== '' && projectJira === entryJira;
+      const matchesName = projectNameLower !== '' && entryProjectNameLower !== '' && projectNameLower === entryProjectNameLower;
       
       let matchesTask = false;
       if (entry.taskId && tasks.length > 0) {
@@ -178,24 +239,72 @@ export function buildCapacityVsTimesheetMetrics(
         }
       }
 
-      return matchesJira || matchesName || matchesTask;
+      return matchesProjectId || matchesJira || matchesName || matchesTask;
     });
 
-    const actualHours = projectTimesheets.reduce((acc, curr) => acc + curr.hours, 0);
+    // Éliminer les doublons potentiels d'entrées d'après leur `id` unique
+    const uniqueEntriesMap = new Map<string, typeof rawProjectTimesheets[0]>();
+    rawProjectTimesheets.forEach((e) => {
+      if (e.id) {
+        uniqueEntriesMap.set(e.id, e);
+      } else {
+        const fallbackKey = `${e.date}_${e.jiraKey || ''}_${e.projectName || ''}_${e.hours}`;
+        uniqueEntriesMap.set(fallbackKey, e);
+      }
+    });
+    const projectTimesheets = Array.from(uniqueEntriesMap.values());
 
-    // 2. Calculer le Plan Capacitaire alloué sur la même période
-    // En multipliant les allocations mensuelles par la fraction du mois couverte par les 100 derniers jours
-    let allocatedHours = 0;
-    if (project.allocations && project.allocations.length > 0) {
+    // Traçabilité explicite spécifique pour le projet CLM
+    const projectNomUpper = (project.nom || '').toUpperCase().trim();
+    const projectJiraUpper = (project.jiraKey || '').toUpperCase().trim();
+    const isCLM = projectNomUpper === 'CLM' || projectJiraUpper === 'CLM';
+
+    if (isCLM) {
+      projectTimesheets.forEach((entry) => {
+        console.log('[CLM Entry Detected]', {
+          date: entry.date,
+          hours: entry.hours || (entry as any).duration || 0,
+          project: entry.projectName,
+          id: entry.id,
+          spaceId: entry.spaceId,
+          userName: entry.userName
+        });
+      });
+    }
+
+    // Sommer les heures réelles (heures ou duration)
+    const actualHours = projectTimesheets.reduce((acc, curr) => acc + (curr.hours || (curr as any).duration || 0), 0);
+
+    if (isCLM) {
+      console.log('[CLM Total Calculated]', actualHours);
+    }
+
+    // 2. Identifier le collaborateur associé à l'utilisateur ciblé dans ce projet
+    const filterUser = userName.trim().toLowerCase();
+    const matchingMembers = project.teamMembers
+      ? project.teamMembers.filter((m) => {
+          const nameLower = (m.name || '').trim().toLowerCase();
+          if (nameLower === '' || filterUser === '') return false;
+          return nameLower === filterUser || nameLower.includes(filterUser) || filterUser.includes(nameLower);
+        })
+      : [];
+    const memberIds = matchingMembers.map((m) => m.id);
+
+    // 3. Calculer le Plan Capacitaire alloué UNIQUEMENT pour cet intervenant sur la même période
+    let projectCapacityInDays = 0;
+    if (project.allocations && project.allocations.length > 0 && memberIds.length > 0) {
       project.allocations.forEach((alloc: MonthlyAllocation) => {
-        const key = `${alloc.year}-${alloc.month}`;
-        const overlap = monthOverlaps.get(key);
-        if (overlap) {
-          // allocatedHours = jours * fraction_du_mois_dans_les_100_jours * 8 heures par jour
-          allocatedHours += alloc.requestedDays * overlap.fraction * 8;
+        if (memberIds.includes(alloc.memberId)) {
+          const key = `${alloc.year}-${alloc.month}`;
+          // Si le mois fait partie de l'intervalle des 100 derniers jours (présent dans monthOverlaps)
+          if (monthOverlaps.has(key)) {
+            // Formule STRICTEMENT demandée : allocatedHours = jours * 8 heures
+            projectCapacityInDays += (alloc.requestedDays || 0);
+          }
         }
       });
     }
+    const allocatedHours = projectCapacityInDays * 8;
 
     const percentage = allocatedHours > 0 ? Math.round((actualHours / allocatedHours) * 100) : 0;
 

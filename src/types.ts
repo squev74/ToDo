@@ -86,6 +86,7 @@ export interface AppDataExport {
 }
 
 export * from './types/recurringTask';
+export * from './types/capacity';
 import { TimeEntry, TimesheetConfig } from './types/timesheet';
 export type { TimeEntry, TimesheetConfig };
 

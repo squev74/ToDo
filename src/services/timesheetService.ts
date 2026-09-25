@@ -82,6 +82,7 @@ export async function fetchMonthTimeEntries(
           date: data.date,
           hours: Number(data.hours),
           comment: data.comment || '',
+          userName: data.userName || '',
         });
       }
     });
@@ -121,6 +122,7 @@ export async function fetchAllTimeEntries(
           date: data.date,
           hours: Number(data.hours),
           comment: data.comment || '',
+          userName: data.userName || '',
         });
       }
     });
@@ -155,6 +157,7 @@ export async function saveTimeEntry(
     hours: number;
     comment?: string;
     taskId?: string;
+    userName?: string;
   }
 ): Promise<void> {
   const docId = getSafeDocId(entry.date, entry.jiraKey);
@@ -179,6 +182,7 @@ export async function saveTimeEntry(
       hours: entry.hours,
       comment: entry.comment || '',
       taskId: entry.taskId || '',
+      userName: entry.userName || '',
     };
 
     await setDoc(docRef, payload);
@@ -200,6 +204,7 @@ export async function saveMultipleTimeEntries(
     hours: number;
     comment?: string;
     taskId?: string;
+    userName?: string;
   }[]
 ): Promise<void> {
   const path = `users/${userId}/timeEntries [BATCH]`;
@@ -223,6 +228,7 @@ export async function saveMultipleTimeEntries(
           hours: entry.hours,
           comment: entry.comment || '',
           taskId: entry.taskId || '',
+          userName: entry.userName || '',
         };
         batch.set(docRef, payload);
       }
@@ -291,6 +297,42 @@ export async function saveTimesheetConfig(
     }, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path, userId);
+  }
+}
+
+/**
+ * Purge définitivement les entrées de timesheet liées à des projets qui n'existent plus dans l'espace actif.
+ */
+export async function purgeOrphanedTimesheets(
+  userId: string,
+  spaceId: string,
+  activeProjectIds: string[]
+): Promise<number> {
+  try {
+    const collRef = collection(db, 'users', userId, 'timeEntries');
+    const snapshot = await getDocs(collRef);
+    let purgedCount = 0;
+    const batch = writeBatch(db);
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      if (data.spaceId === spaceId) {
+        const identifier = data.jiraKey;
+        // Si l'entrée a un JIRA key ou ID qui n'est pas présent dans la liste des projets actifs (ou vide)
+        if (identifier && !activeProjectIds.includes(identifier)) {
+          batch.delete(docSnap.ref);
+          purgedCount++;
+        }
+      }
+    });
+
+    if (purgedCount > 0) {
+      await batch.commit();
+    }
+    return purgedCount;
+  } catch (error) {
+    console.error('Erreur lors de la purge des timesheets orphelins:', error);
+    return 0;
   }
 }
 

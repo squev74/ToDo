@@ -37,6 +37,8 @@ interface TimesheetGridProps {
   onCreateGlobalProject: (nom: string, jiraKey: string) => Promise<void>; // Créer un projet globalement
   onUpdateGlobalProject: (id: string, nom: string, jiraKey: string) => Promise<void>; // Mettre à jour un projet globalement
   onOpenReportModal: (year: number, month: number) => void;
+  userName?: string; // Nom de l'intervenant (ex: "Sylvain")
+  onUserNameChange?: (name: string) => void; // Callback pour synchroniser le nom
 }
 
 const MONTHS_FR = [
@@ -52,6 +54,8 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
   onCreateGlobalProject,
   onUpdateGlobalProject,
   onOpenReportModal,
+  userName = 'Sylvain',
+  onUserNameChange,
 }) => {
   const [currentYear, setCurrentYear] = useState<number>(() => new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState<number>(() => new Date().getMonth() + 1); // 1-12
@@ -59,6 +63,43 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [savingCell, setSavingCell] = useState<string | null>(null); // e.g. "date_jiraKey"
   const [error, setError] = useState<string | null>(null);
+
+  // Initialisation dynamique du nom d'utilisateur depuis localStorage ou prop de secours
+  const [activeUserName, setActiveUserName] = useState<string>(() => {
+    try {
+      const saved = localStorage.getItem(`timesheet_user_name_${spaceId}`);
+      return saved || userName || 'Sylvain';
+    } catch {
+      return userName || 'Sylvain';
+    }
+  });
+
+  // Mettre à jour si spaceId ou userName prop change
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`timesheet_user_name_${spaceId}`);
+      if (saved) {
+        setActiveUserName(saved);
+      } else {
+        setActiveUserName(userName || 'Sylvain');
+      }
+    } catch {
+      setActiveUserName(userName || 'Sylvain');
+    }
+  }, [spaceId, userName]);
+
+  const handleUserNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setActiveUserName(val);
+    try {
+      localStorage.setItem(`timesheet_user_name_${spaceId}`, val);
+    } catch (err) {
+      console.error('Erreur sauvegarde nom intervenant local:', err);
+    }
+    if (onUserNameChange) {
+      onUserNameChange(val);
+    }
+  };
 
   // États pour les projets de la timesheet
   const [activeProjectIds, setActiveProjectIds] = useState<string[]>([]);
@@ -406,6 +447,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
         date: dateStr,
         hours,
         comment: existingComment,
+        userName: activeUserName,
       });
 
       setEntries((prev) => {
@@ -422,6 +464,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
           date: dateStr,
           hours,
           comment: existingComment,
+          userName: activeUserName,
         };
         return [...filtered, newEntry];
       });
@@ -465,6 +508,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
         date,
         hours: hours > 0 ? hours : 0,
         comment: comment.trim(),
+        userName: activeUserName,
       });
 
       setEntries((prev) => {
@@ -481,6 +525,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
           date,
           hours: hours > 0 ? hours : 0,
           comment: comment.trim(),
+          userName: activeUserName,
         };
         return [...filtered, newEntry];
       });
@@ -543,14 +588,31 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
     <div className="w-full space-y-6">
       {/* SECTION BANNIÈRE & CONTRÔLE DE SÉLECTION */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-[#F0EFEB] shadow-[0_2px_12px_rgba(0,0,0,0.01)]">
-        <div>
-          <h2 className="text-base font-semibold text-[#1A1D1A] tracking-wide flex items-center gap-2">
-            <Clock className="h-5 w-5 text-indigo-600" />
-            Suivi des imputations de temps (Timesheet)
-          </h2>
-          <p className="text-xs text-[#737873] mt-1">
-            Saisissez quotidiennement le temps passé par projet dans l&apos;espace : <strong className="text-[#1A1D1A] font-medium">{spaceName}</strong>.
-          </p>
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-[#1A1D1A] tracking-wide flex items-center gap-2">
+              <Clock className="h-5 w-5 text-indigo-600" />
+              Suivi des imputations de temps (Timesheet)
+            </h2>
+            <p className="text-xs text-[#737873] mt-1">
+              Saisissez quotidiennement le temps passé par projet dans l&apos;espace : <strong className="text-[#1A1D1A] font-medium">{spaceName}</strong>.
+            </p>
+          </div>
+
+          {/* Saisie épurée de l'intervenant pour la feuille de temps */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="timesheet-user-name-input" className="text-xs text-[#737873] font-light">
+              Nom / Intervenant :
+            </label>
+            <input
+              id="timesheet-user-name-input"
+              type="text"
+              value={activeUserName}
+              onChange={handleUserNameChange}
+              className="rounded-lg border border-[#F0EFEB] bg-[#F9F8F6] px-2.5 py-1 text-xs text-[#1A1D1A] font-medium focus:border-indigo-500 focus:bg-white focus:outline-none transition-all duration-200 w-48"
+              placeholder="Ex: Sylvain"
+            />
+          </div>
         </div>
 
         {/* CONTROLES NAVIGATION MOIS */}

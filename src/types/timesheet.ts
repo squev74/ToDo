@@ -8,6 +8,7 @@ export interface TimeEntry {
   date: string; // format YYYY-MM-DD
   hours: number; // ex: 0.5, 1, 2, 4, 8
   comment?: string;
+  userName?: string; // Identifie précisément l'intervenant (ex: "Sylvain")
 }
 
 export interface PMOProject {
