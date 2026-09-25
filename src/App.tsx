@@ -17,6 +17,7 @@ import {
   Loader2,
   Zap,
   Shield,
+  LayoutGrid,
 } from 'lucide-react';
 import { Tache, Projet, Espace, StatutTache, ProjectDeliverable, TeamMember, MonthlyAllocation, RaidItem } from './types';
 import {
@@ -89,6 +90,7 @@ import {
   createNewTask,
 } from './services/taskService';
 import { AnalyticsReportingView } from './views/AnalyticsReportingView';
+import { TaskKanbanBoard } from './components/tasks/TaskKanbanBoard';
 
 // Module Timesheet et imputations de temps JIRA
 import { TimesheetGrid } from './components/TimesheetGrid';
@@ -132,6 +134,60 @@ export default function App() {
   // Navigation Vue Principale : 'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge' | 'archives' | 'analytics'
   const [currentView, setCurrentView] = useState<'tasks' | 'backlog' | 'report' | 'timesheet' | 'admin' | 'knowledge' | 'archives' | 'analytics'>('tasks');
   const [taskModalDefaultStatus, setTaskModalDefaultStatus] = useState<StatutTache>('Open');
+
+  // Vue préférée des tâches de l'espace courant : 'list' | 'kanban'
+  const [preferredTaskView, setPreferredTaskView] = useState<'list' | 'kanban'>(() => {
+    try {
+      const saved = localStorage.getItem(`pmo_preferred_task_view_${activeSpaceId}`);
+      return (saved === 'kanban') ? 'kanban' : 'list';
+    } catch {
+      return 'list';
+    }
+  });
+
+  // Recharger au changement d'espace actif
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`pmo_preferred_task_view_${activeSpaceId}`);
+      setPreferredTaskView((saved === 'kanban') ? 'kanban' : 'list');
+    } catch {
+      setPreferredTaskView('list');
+    }
+  }, [activeSpaceId]);
+
+  const handleSetPreferredTaskView = (view: 'list' | 'kanban') => {
+    setPreferredTaskView(view);
+    try {
+      localStorage.setItem(`pmo_preferred_task_view_${activeSpaceId}`, view);
+    } catch (err) {
+      console.error('Erreur sauvegarde vue préférée:', err);
+    }
+  };
+
+  const handleUpdateTaskTitle = (taskId: string, newTitle: string) => {
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === taskId) {
+          const nowIso = new Date().toISOString();
+          const updated = {
+            ...t,
+            titre: newTitle,
+            lastActivityAt: nowIso,
+            updatedAt: nowIso,
+            dateModification: nowIso,
+          };
+          if (user && !user.isLocalFallback) {
+            saveTaskToFirestore(user.uid, updated).catch((err) => {
+              console.error('Erreur Firestore mise à jour titre:', err);
+            });
+          }
+          return updated;
+        }
+        return t;
+      })
+    );
+    showToast('Titre de la tâche mis à jour.');
+  };
 
   // Filtres et Recherche Multi-Sélection (avec persistance par Projet et Vue)
   const [selectedProjectIdsState, setSelectedProjectIdsState] = useState<string[] | null>(null);
@@ -1636,87 +1692,139 @@ export default function App() {
               }}
             />
 
-            {/* LISTE DES TÂCHES DE L'ESPACE */}
-            <div id="tasks-list-container" className="space-y-1.5 sm:space-y-2">
-              {sortedAndFilteredTasks.length === 0 ? (
-                <div
-                  id="empty-tasks-placeholder"
-                  className="rounded-2xl border border-dashed border-[#F0EFEB] bg-white p-12 text-center shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+            {/* COMMUTATEUR DE VUE (LISTE <-> KANBAN) & TITRE */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white p-4 rounded-2xl border border-[#F0EFEB] shadow-[0_2px_10px_rgba(0,0,0,0.01)]">
+              <div className="space-y-0.5">
+                <h3 className="text-xs font-semibold tracking-wider text-[#737873] uppercase">Tableau opérationnel</h3>
+                <p className="text-[10px] text-[#737873] font-light">Gérez et suivez le cycle de vie de vos tâches actives</p>
+              </div>
+
+              {/* Toggle de vue */}
+              <div className="flex items-center rounded-xl bg-[#F9F8F6] p-0.5 border border-[#F0EFEB] self-start sm:self-auto">
+                <button
+                  type="button"
+                  onClick={() => handleSetPreferredTaskView('list')}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                    preferredTaskView === 'list'
+                      ? 'bg-white text-[#1A1D1A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-[#F0EFEB]'
+                      : 'text-[#737873] hover:text-[#1A1D1A]'
+                  }`}
                 >
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F9F8F6] text-[#6B8E78] border border-[#F0EFEB] mb-3">
-                    <FileText className="h-6 w-6" />
+                  <ListTodo className="h-3.5 w-3.5" />
+                  <span>Vue Liste</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetPreferredTaskView('kanban')}
+                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                    preferredTaskView === 'kanban'
+                      ? 'bg-white text-[#1A1D1A] shadow-[0_1px_4px_rgba(0,0,0,0.04)] border border-[#F0EFEB]'
+                      : 'text-[#737873] hover:text-[#1A1D1A]'
+                  }`}
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  <span>Vue Kanban</span>
+                </button>
+              </div>
+            </div>
+
+            {/* RENDU SÉLECTIF DE LA LISTE OU DU KANBAN */}
+            {preferredTaskView === 'kanban' ? (
+              <TaskKanbanBoard
+                tasks={sortedAndFilteredTasks}
+                projects={currentSpaceProjects}
+                onStatusChange={handleStatusChangeRequest}
+                onEdit={(t) => {
+                  setEditingTask(t);
+                  setTaskModalDefaultStatus(t.statut);
+                  setIsTaskModalOpen(true);
+                }}
+                onDelete={handleRequestDeleteTask}
+                onUpdateTitle={handleUpdateTaskTitle}
+              />
+            ) : (
+              /* LISTE DES TÂCHES DE L'ESPACE */
+              <div id="tasks-list-container" className="space-y-1.5 sm:space-y-2">
+                {sortedAndFilteredTasks.length === 0 ? (
+                  <div
+                    id="empty-tasks-placeholder"
+                    className="rounded-2xl border border-dashed border-[#F0EFEB] bg-white p-12 text-center shadow-[0_2px_10px_rgba(0,0,0,0.02)]"
+                  >
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#F9F8F6] text-[#6B8E78] border border-[#F0EFEB] mb-3">
+                      <FileText className="h-6 w-6" />
+                    </div>
+                    <h3 className="text-sm font-normal tracking-wide text-[#1A1D1A]">
+                      {hasActiveFilters
+                        ? 'Aucune tâche ne correspond à vos filtres'
+                        : `Aucune tâche active dans l’espace « ${currentSpace.nom} »`}
+                    </h3>
+                    <p className="mt-1 text-xs text-[#737873] max-w-sm mx-auto font-light">
+                      {hasActiveFilters
+                        ? 'Essayez d’élargir vos termes de recherche ou de réinitialiser les filtres.'
+                        : 'Créez votre première tâche ou piochez dans votre Backlog pour alimenter ce tableau opérationnel.'}
+                    </p>
+                    <div className="mt-4 flex justify-center gap-2">
+                      {hasActiveFilters ? (
+                        <button
+                          type="button"
+                          onClick={handleResetFilters}
+                          className="rounded-xl border border-[#F0EFEB] bg-white px-3.5 py-1.5 text-xs font-medium text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
+                        >
+                          Effacer les filtres
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingTask(null);
+                            setTaskModalDefaultStatus('Open');
+                            setIsTaskModalOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-[#6B8E78] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#5d7c68] shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-colors"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          <span>Créer une tâche</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <h3 className="text-sm font-normal tracking-wide text-[#1A1D1A]">
-                    {hasActiveFilters
-                      ? 'Aucune tâche ne correspond à vos filtres'
-                      : `Aucune tâche active dans l’espace « ${currentSpace.nom} »`}
-                  </h3>
-                  <p className="mt-1 text-xs text-[#737873] max-w-sm mx-auto font-light">
-                    {hasActiveFilters
-                      ? 'Essayez d’élargir vos termes de recherche ou de réinitialiser les filtres.'
-                      : 'Créez votre première tâche ou piochez dans votre Backlog pour alimenter ce tableau opérationnel.'}
-                  </p>
-                  <div className="mt-4 flex justify-center gap-2">
-                    {hasActiveFilters ? (
-                      <button
-                        type="button"
-                        onClick={handleResetFilters}
-                        className="rounded-xl border border-[#F0EFEB] bg-white px-3.5 py-1.5 text-xs font-medium text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-colors"
-                      >
-                        Effacer les filtres
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingTask(null);
-                          setTaskModalDefaultStatus('Open');
+                ) : (
+                  sortedAndFilteredTasks.map((task, index) => {
+                    const project = task.projetId ? projectsMap.get(task.projetId) : undefined;
+                    return (
+                      <TaskItem
+                        key={task.id}
+                        task={task}
+                        project={project}
+                        index={index}
+                        onStatusChangeRequest={handleStatusChangeRequest}
+                        onStatusChange={handleStatusChangeRequest}
+                        onEditTask={(t) => {
+                          setEditingTask(t);
+                          setTaskModalDefaultStatus(t.statut);
                           setIsTaskModalOpen(true);
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-[#6B8E78] px-3.5 py-1.5 text-xs font-medium text-white hover:bg-[#5d7c68] shadow-[0_2px_10px_rgba(0,0,0,0.02)] transition-colors"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                        <span>Créer une tâche</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                sortedAndFilteredTasks.map((task, index) => {
-                  const project = task.projetId ? projectsMap.get(task.projetId) : undefined;
-                  return (
-                    <TaskItem
-                      key={task.id}
-                      task={task}
-                      project={project}
-                      index={index}
-                      onStatusChangeRequest={handleStatusChangeRequest}
-                      onStatusChange={handleStatusChangeRequest}
-                      onEditTask={(t) => {
-                        setEditingTask(t);
-                        setTaskModalDefaultStatus(t.statut);
-                        setIsTaskModalOpen(true);
-                      }}
-                      onEdit={(t) => {
-                        setEditingTask(t);
-                        setTaskModalDefaultStatus(t.statut);
-                        setIsTaskModalOpen(true);
-                      }}
-                      onRequestDelete={handleRequestDeleteTask}
-                      onDelete={handleRequestDeleteTask}
-                      onAddComment={handleAddCommentToTask}
-                      onQuickLogTime={handleQuickLogTime}
-                      onDragStart={handleDragStart}
-                      onDragOver={handleDragOver}
-                      onDragEnd={handleDragEnd}
-                      onDrop={handleDrop}
-                      isDragged={draggedTaskId === task.id}
-                      isDragOver={dragOverIndex === index}
-                    />
-                  );
-                })
-              )}
-            </div>
+                        onEdit={(t) => {
+                          setEditingTask(t);
+                          setTaskModalDefaultStatus(t.statut);
+                          setIsTaskModalOpen(true);
+                        }}
+                        onRequestDelete={handleRequestDeleteTask}
+                        onDelete={handleRequestDeleteTask}
+                        onAddComment={handleAddCommentToTask}
+                        onQuickLogTime={handleQuickLogTime}
+                        onDragStart={handleDragStart}
+                        onDragOver={handleDragOver}
+                        onDragEnd={handleDragEnd}
+                        onDrop={handleDrop}
+                        isDragged={draggedTaskId === task.id}
+                        isDragOver={dragOverIndex === index}
+                      />
+                    );
+                  })
+                )}
+              </div>
+            )}
           </div>
          ) : currentView === 'timesheet' ? (
           <TimesheetGrid
