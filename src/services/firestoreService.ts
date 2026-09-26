@@ -178,6 +178,7 @@ export function sanitizeTaskForFirestore(task: Tache, userId: string): Record<st
       task.createdAt ||
       new Date().toISOString(),
     ordre: typeof task.ordre === 'number' ? task.ordre : 0,
+    activationDate: task.activationDate ?? null,
     commentaires: (task.commentaires || []).map((c) => ({
       id: c.id,
       texte: c.texte || '',

@@ -24,6 +24,7 @@ export interface Tache {
   lastActivityAt?: string; // Horodatage ISO de dernière activité (édition, statut, commentaire)
   ordre: number; // Nombre entier pour le tri
   commentaires: Commentaire[];
+  activationDate?: string; // Date d'activation planifiée (format YYYY-MM-DD), applicable uniquement au statut 'Backlog'
 }
 
 // Alias Task conforme aux conventions TypeScript

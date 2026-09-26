@@ -10,7 +10,8 @@ import {
   Clock,
   Sparkles,
   Layers,
-  BookOpen
+  BookOpen,
+  Trash2
 } from 'lucide-react';
 import { KnowledgeDoc, KnowledgeCategory } from '../types';
 import { DocEditor } from './DocEditor';
@@ -108,13 +109,17 @@ const CATEGORY_NAMES: Record<KnowledgeCategory, string> = {
   other: 'Autre'
 };
 
-export const KnowledgeBaseView: React.FC = () => {
+interface KnowledgeBaseViewProps {
+  activeSpaceId?: string;
+}
+
+export const KnowledgeBaseView: React.FC<KnowledgeBaseViewProps> = ({ activeSpaceId }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
 
   // Charger les documents existants depuis le localStorage ou utiliser les starters
   const [docs, setDocs] = useState<KnowledgeDoc[]>(() => {
-    const local = localStorage.getItem('knowledge_docs_list');
+    const local = localStorage.getItem('pmo_sop_articles') || localStorage.getItem('knowledge_docs_list');
     if (local) {
       try {
         return JSON.parse(local);
@@ -125,11 +130,10 @@ export const KnowledgeBaseView: React.FC = () => {
     return STARTER_DOCS;
   });
 
-  const [selectedDocId, setSelectedDocId] = useState<string | null>(() => {
-    return docs.length > 0 ? docs[0].id : null;
-  });
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isCreatingNew, setIsCreatingNew] = useState(false);
+  const [docIdToDelete, setDocIdToDelete] = useState<string | null>(null);
 
   // Filtres
   const [searchQuery, setSearchQuery] = useState('');
@@ -149,9 +153,11 @@ export const KnowledgeBaseView: React.FC = () => {
         } else {
           // Si la collection est vide, on initialise la base avec les starters
           for (const sDoc of STARTER_DOCS) {
-            await saveKnowledgeDoc(user.uid, sDoc);
+            // Associer un spaceId par défaut s'il y en a un
+            const docToSave = { ...sDoc, spaceId: activeSpaceId || 'default' };
+            await saveKnowledgeDoc(user.uid, docToSave);
           }
-          setDocs(STARTER_DOCS);
+          setDocs(STARTER_DOCS.map(s => ({ ...s, spaceId: activeSpaceId || 'default' })));
         }
       } catch (err) {
         console.error('Erreur de récupération des SOPs depuis Firestore :', err);
@@ -166,14 +172,41 @@ export const KnowledgeBaseView: React.FC = () => {
   // Sauvegarder les documents localement à chaque changement (LocalStorage en backup de secours)
   useEffect(() => {
     localStorage.setItem('knowledge_docs_list', JSON.stringify(docs));
+    localStorage.setItem('pmo_sop_articles', JSON.stringify(docs));
   }, [docs]);
 
-  // Gérer la sélection automatique du premier document disponible
+  // Filtrer la liste des documents par espace actif (avec visibilité transversale pour les articles sans spaceId) et critères de recherche
+  const filteredDocs = useMemo(() => {
+    // Un article est visible s'il n'a pas de spaceId défini (transversal) OU si son spaceId correspond à l'espace actif
+    const articlesForCurrentSpace = docs.filter((doc) => {
+      return !doc.spaceId || doc.spaceId.trim() === '' || doc.spaceId === activeSpaceId;
+    });
+
+    // Le filtre de recherche par mot-clé et catégories s'applique sur ces articles visibles
+    return articlesForCurrentSpace.filter((doc) => {
+      const matchesSearch = 
+        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (doc.summary && doc.summary.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        doc.contentHtml.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      const matchesCategory = selectedCategory === 'all' || doc.category === selectedCategory;
+      const matchesTag = selectedTag === 'all' || doc.tags.includes(selectedTag);
+
+      return matchesSearch && matchesCategory && matchesTag;
+    });
+  }, [docs, searchQuery, selectedCategory, selectedTag, activeSpaceId]);
+
+  // Gérer la sélection automatique du premier document disponible de l'espace actif
   useEffect(() => {
-    if (!selectedDocId && docs.length > 0) {
-      setSelectedDocId(docs[0].id);
+    if (filteredDocs.length > 0) {
+      const isSelectedInFiltered = filteredDocs.some(d => d.id === selectedDocId);
+      if (!isSelectedInFiltered) {
+        setSelectedDocId(filteredDocs[0].id);
+      }
+    } else {
+      setSelectedDocId(null);
     }
-  }, [docs, selectedDocId]);
+  }, [filteredDocs, selectedDocId]);
 
   // Récupérer le document actuellement sélectionné
   const activeDoc = useMemo(() => {
@@ -183,78 +216,74 @@ export const KnowledgeBaseView: React.FC = () => {
   // Extraire tous les tags uniques pour la barre de filtres
   const allTags = useMemo(() => {
     const tagsSet = new Set<string>();
-    docs.forEach(doc => {
+    filteredDocs.forEach(doc => {
       doc.tags.forEach(tag => tagsSet.add(tag));
     });
     return Array.from(tagsSet);
-  }, [docs]);
-
-  // Filtrer la liste des documents
-  const filteredDocs = useMemo(() => {
-    return docs.filter(doc => {
-      // Recherche textuelle
-      const matchesSearch = 
-        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        (doc.summary && doc.summary.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        doc.contentHtml.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      // Filtre catégorie
-      const matchesCategory = selectedCategory === 'all' || doc.category === selectedCategory;
-
-      // Filtre tag
-      const matchesTag = selectedTag === 'all' || doc.tags.includes(selectedTag);
-
-      return matchesSearch && matchesCategory && matchesTag;
-    });
-  }, [docs, searchQuery, selectedCategory, selectedTag]);
+  }, [filteredDocs]);
 
   // Enregistrer ou modifier un document
   const handleSaveDoc = async (savedDoc: KnowledgeDoc) => {
+    const docToSave: KnowledgeDoc = {
+      ...savedDoc,
+      spaceId: savedDoc.spaceId || activeSpaceId || 'default'
+    };
+
     setDocs(prevDocs => {
-      const exists = prevDocs.some(d => d.id === savedDoc.id);
+      const exists = prevDocs.some(d => d.id === docToSave.id);
       if (exists) {
-        return prevDocs.map(d => d.id === savedDoc.id ? savedDoc : d);
+        return prevDocs.map(d => d.id === docToSave.id ? docToSave : d);
       } else {
-        return [savedDoc, ...prevDocs];
+        return [docToSave, ...prevDocs];
       }
     });
 
     if (user?.uid) {
       try {
-        await saveKnowledgeDoc(user.uid, savedDoc);
+        await saveKnowledgeDoc(user.uid, docToSave);
       } catch (err) {
         console.error('Erreur de sauvegarde de la SOP sur Firestore :', err);
       }
     }
 
-    setSelectedDocId(savedDoc.id);
+    setSelectedDocId(docToSave.id);
     setIsEditing(false);
     setIsCreatingNew(false);
   };
 
-  // Supprimer un document
-  const handleDeleteDoc = async (id: string) => {
+  // Supprimer un document de la base de données Firestore et rafraîchir l'état local
+  const onDeleteArticle = async (id: string) => {
     const remaining = docs.filter(d => d.id !== id);
     setDocs(remaining);
+    localStorage.setItem('knowledge_docs_list', JSON.stringify(remaining));
+    localStorage.setItem('pmo_sop_articles', JSON.stringify(remaining));
+
+    // Sélectionner un autre document du même espace s'il en reste
+    const filteredRemaining = remaining.filter((doc) => {
+      return !doc.spaceId || doc.spaceId.trim() === '' || doc.spaceId === activeSpaceId;
+    });
+
+    if (filteredRemaining.length > 0) {
+      setSelectedDocId(filteredRemaining[0].id);
+    } else {
+      setSelectedDocId(null);
+    }
 
     if (user?.uid) {
       try {
         await deleteKnowledgeDoc(user.uid, id);
+        alert("L'article a été supprimé de la base de données Firestore avec succès.");
       } catch (err) {
         console.error('Erreur de suppression de la SOP sur Firestore :', err);
+        alert("Erreur lors de la suppression de l'article sur la base de données.");
       }
-    }
-    
-    // Sélectionner un autre document s'il en reste
-    if (remaining.length > 0) {
-      setSelectedDocId(remaining[0].id);
-    } else {
-      setSelectedDocId(null);
     }
     
     setIsEditing(false);
     setIsCreatingNew(false);
   };
+
+  const handleDeleteDoc = onDeleteArticle;
 
   // Initier la création d'un nouveau SOP
   const handleInitCreate = () => {
@@ -363,16 +392,25 @@ export const KnowledgeBaseView: React.FC = () => {
               filteredDocs.map((doc) => {
                 const isActive = doc.id === selectedDocId && !isCreatingNew;
                 return (
-                  <button
+                  <div
                     key={doc.id}
                     id={`btn-sop-item-${doc.id}`}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => {
                       setSelectedDocId(doc.id);
                       setIsEditing(false);
                       setIsCreatingNew(false);
                     }}
-                    className={`w-full text-left p-4 hover:bg-[#FAF9F6]/50 transition-colors flex items-start gap-3 relative ${
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedDocId(doc.id);
+                        setIsEditing(false);
+                        setIsCreatingNew(false);
+                      }
+                    }}
+                    className={`w-full text-left p-4 hover:bg-[#FAF9F6]/50 transition-colors flex items-start gap-3 relative cursor-pointer select-none ${
                       isActive ? 'bg-[#FAF9F6]' : ''
                     }`}
                   >
@@ -418,10 +456,26 @@ export const KnowledgeBaseView: React.FC = () => {
                       )}
                     </div>
 
-                    <ChevronRight className={`h-4 w-4 text-[#737873]/50 shrink-0 self-center transition-transform ${
-                      isActive ? 'translate-x-0.5 text-[#6B8E78]' : ''
-                    }`} />
-                  </button>
+                    <div className="flex flex-col items-center justify-between self-stretch shrink-0 pt-0.5">
+                      <ChevronRight className={`h-4 w-4 text-[#737873]/50 transition-transform ${
+                        isActive ? 'translate-x-0.5 text-[#6B8E78]' : ''
+                      }`} />
+                      
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setDocIdToDelete(doc.id);
+                        }}
+                        className="mt-4 p-1 rounded-md text-rose-500 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                        title="Supprimer l'article"
+                        id={`btn-delete-sop-card-${doc.id}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
                 );
               })
             )}
@@ -444,6 +498,38 @@ export const KnowledgeBaseView: React.FC = () => {
         </div>
 
       </div>
+
+      {/* MODALE DE CONFIRMATION DE SUPPRESSION SOP */}
+      {docIdToDelete && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl border border-[#F0EFEB] p-6 max-w-md w-full shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+            <h3 className="text-sm font-bold text-[#1A1D1A]">Supprimer l'article</h3>
+            <p className="mt-2 text-xs text-[#737873] leading-relaxed">
+              Êtes-vous sûr de vouloir supprimer définitivement cet article de la Base de Connaissances ? Cette action est irréversible et supprimera le document de tous les stockages.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setDocIdToDelete(null)}
+                className="rounded-xl border border-[#EAE8E2] bg-white px-4 py-2 text-xs font-semibold text-[#1A1D1A] hover:bg-slate-50 transition-all"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const targetId = docIdToDelete;
+                  setDocIdToDelete(null);
+                  await onDeleteArticle(targetId);
+                }}
+                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 transition-all shadow-xs"
+              >
+                Confirmer la suppression
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

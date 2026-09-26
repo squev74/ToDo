@@ -161,6 +161,7 @@ export const DocEditor: React.FC<DocEditorProps> = ({
 
     const savedDoc: KnowledgeDoc = {
       id: doc?.id || `doc-${Date.now()}`,
+      spaceId: doc?.spaceId,
       title: title.trim(),
       category,
       tags: parsedTags,

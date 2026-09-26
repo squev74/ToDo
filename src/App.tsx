@@ -227,6 +227,56 @@ export default function App() {
     }
   }, [selectedProjectIdsState, activeSpaceId, projects]);
 
+  // Moteur de réveil automatique des tâches du Backlog (Scheduled Activation)
+  useEffect(() => {
+    if (!activeSpaceId || tasks.length === 0) return;
+
+    // Récupérer la date du jour locale au format YYYY-MM-DD
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const localTodayStr = `${y}-${m}-${d}`;
+
+    // Trouver les tâches éligibles au réveil
+    const tasksToWakeUp = tasks.filter((t) => {
+      return (
+        t.spaceId === activeSpaceId &&
+        (t.statut === 'Backlog' || t.statut === 'backlog') &&
+        t.activationDate &&
+        t.activationDate <= localTodayStr
+      );
+    });
+
+    if (tasksToWakeUp.length > 0) {
+      const nowIso = new Date().toISOString();
+      const updatedTasks = tasks.map((t) => {
+        const shouldWakeUp = tasksToWakeUp.some((w) => w.id === t.id);
+        if (shouldWakeUp) {
+          const updated = {
+            ...t,
+            statut: 'Open' as StatutTache,
+            activationDate: undefined, // Réinitialiser le réveil
+            lastActivityAt: nowIso,
+            updatedAt: nowIso,
+            dateModification: nowIso,
+          };
+          // Si utilisateur connecté, sauvegarder dans Firestore
+          if (user && !user.isLocalFallback) {
+            saveTaskToFirestore(user.uid, updated).catch((err) => {
+              console.error('Erreur Firestore réveil automatique:', err);
+            });
+          }
+          return updated;
+        }
+        return t;
+      });
+
+      setTasks(updatedTasks);
+      showToast(`${tasksToWakeUp.length} tâche(s) réveillée(s) du Backlog`);
+    }
+  }, [activeSpaceId, tasks, user]);
+
   const activeProjectIdForStorage = useMemo(() => {
     if (selectedProjectIdsState && selectedProjectIdsState.length === 1) {
       return selectedProjectIdsState[0];
@@ -1023,6 +1073,7 @@ export default function App() {
     statut: StatutTache;
     dateEcheance?: string | null;
     blockedReason?: string;
+    activationDate?: string | null;
   }) => {
     if (editingTask) {
       const comments = [...(editingTask.commentaires || [])];
@@ -1048,6 +1099,7 @@ export default function App() {
         userId: user?.uid || editingTask.userId,
         spaceId: editingTask.spaceId || currentSpace.id,
         commentaires: comments,
+        activationDate: taskData.activationDate || undefined,
       };
 
       setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? updatedTask : t)));
@@ -1086,6 +1138,10 @@ export default function App() {
 
       if (taskData.jiraKey) {
         newTask.jiraKey = taskData.jiraKey;
+      }
+
+      if (taskData.activationDate) {
+        newTask.activationDate = taskData.activationDate;
       }
 
       setTasks((prev) => [newTask, ...prev]);
@@ -1845,7 +1901,7 @@ export default function App() {
             onUserNameChange={setTimesheetUserName}
           />
         ) : currentView === 'knowledge' ? (
-          <KnowledgeBaseView />
+          <KnowledgeBaseView activeSpaceId={currentSpace.id} />
         ) : currentView === 'archives' ? (
           <ArchivedTasksTab
             tasks={currentSpaceTasks}
@@ -1912,6 +1968,7 @@ export default function App() {
           setEditingTask(null);
           setTaskModalDefaultStatus('Open');
         }}
+        onAddComment={handleAddCommentToTask}
       />
 
       {/* MODALE MOTIF DE BLOCAGE (Règle 4) */}

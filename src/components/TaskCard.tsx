@@ -309,24 +309,26 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           </h4>
 
           {/* BADGE DE STATUT VIF ET COLORÉ (Backlog, À faire, En cours, Bloqué, Terminé) */}
-          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-            <select
-              id={`task-status-select-${task.id}`}
-              value={task.statut}
-              onChange={(e) => {
-                handleStatusChange(task, e.target.value as StatutTache);
-              }}
-              className={`rounded-lg border px-2.5 py-0.5 text-xs cursor-pointer transition-all duration-200 focus:outline-none shadow-2xs ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
-              title={task.cancellationReason ? `Motif d'annulation : ${task.cancellationReason}` : "Modifier le statut"}
-            >
-              <option value="Backlog" className="bg-white text-purple-700 font-semibold">Backlog</option>
-              <option value="Open" className="bg-white text-sky-600 font-medium">À Faire</option>
-              <option value="In Progress" className="bg-white text-amber-900 font-semibold">En Cours</option>
-              <option value="Blocked" className="bg-white text-red-600 font-bold">Bloqué</option>
-              <option value="Done" className="bg-white text-emerald-600 font-medium">Terminé</option>
-              <option value="Cancelled" className="bg-white text-rose-600 font-medium">Annulé</option>
-            </select>
-          </div>
+          {!isBacklog && (
+            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+              <select
+                id={`task-status-select-${task.id}`}
+                value={task.statut}
+                onChange={(e) => {
+                  handleStatusChange(task, e.target.value as StatutTache);
+                }}
+                className={`rounded-lg border px-2.5 py-0.5 text-xs cursor-pointer transition-all duration-200 focus:outline-none shadow-2xs ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
+                title={task.cancellationReason ? `Motif d'annulation : ${task.cancellationReason}` : "Modifier le statut"}
+              >
+                <option value="Backlog" className="bg-white text-purple-700 font-semibold">Backlog</option>
+                <option value="Open" className="bg-white text-sky-600 font-medium">À Faire</option>
+                <option value="In Progress" className="bg-white text-amber-900 font-semibold">En Cours</option>
+                <option value="Blocked" className="bg-white text-red-600 font-bold">Bloqué</option>
+                <option value="Done" className="bg-white text-emerald-600 font-medium">Terminé</option>
+                <option value="Cancelled" className="bg-white text-rose-600 font-medium">Annulé</option>
+              </select>
+            </div>
+          )}
 
           {/* PASTILLE DE PROJET DYNAMIQUE & SATURÉE (Indigo, Teal, Rose, Lime, Cyan, etc.) */}
           {project && projectStyle && (
@@ -383,6 +385,18 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 <Calendar className="h-3.5 w-3.5 text-slate-500" />
               )}
               <span>{formatDateOnly(task.dateEcheance)}</span>
+            </span>
+          )}
+
+          {/* Badge de réveil planifié pour le Backlog */}
+          {isBacklog && task.activationDate && (
+            <span
+              id={`task-activation-badge-${task.id}`}
+              className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 text-purple-800 px-2.5 py-0.5 text-xs font-semibold shrink-0"
+              title={`Réveil programmé le : ${task.activationDate}`}
+            >
+              <Clock className="h-3.5 w-3.5 text-purple-600" />
+              <span>Réveil : {formatDateOnly(task.activationDate)}</span>
             </span>
           )}
 

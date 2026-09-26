@@ -52,6 +52,7 @@ export async function fetchKnowledgeDocs(userId: string): Promise<KnowledgeDoc[]
       const data = firestoreDoc.data();
       docs.push({
         id: firestoreDoc.id,
+        spaceId: data.spaceId || undefined,
         title: data.title || '',
         category: data.category || 'other',
         tags: Array.isArray(data.tags) ? data.tags : [],
@@ -78,6 +79,7 @@ export async function saveKnowledgeDoc(userId: string, kbDoc: KnowledgeDoc): Pro
     const docRef = doc(db, 'users', userId, 'knowledgeDocs', kbDoc.id);
     const payload = {
       id: kbDoc.id,
+      spaceId: kbDoc.spaceId || null,
       title: kbDoc.title,
       category: kbDoc.category,
       tags: kbDoc.tags,
