@@ -2241,6 +2241,7 @@ export default function App() {
         projects={currentSpaceProjects}
         phases={phases}
         activityLogs={activityLogs}
+        activeSpaceId={currentSpace.id}
         onSave={handleSaveTask}
         onClose={() => {
           setIsTaskModalOpen(false);

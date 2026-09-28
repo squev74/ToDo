@@ -10,4 +10,8 @@ export interface KnowledgeDoc {
   summary?: string;
   createdAt: string;
   updatedAt: string;
+  keywords?: string[]; // Mots-clés de déclenchement pour la recommandation intelligente
 }
+
+export type SopArticle = KnowledgeDoc;
+

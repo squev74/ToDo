@@ -69,8 +69,8 @@ export interface ProjectPhase {
 
 import { ProjectDeliverable, Project, TeamMember, MonthlyAllocation } from './types/project';
 import { RaidItem, RaidType, ImpactLevel, ProbabilityLevel, RoamStatus } from './types/raid';
-import { KnowledgeDoc, KnowledgeCategory } from './types/knowledge';
-export type { ProjectDeliverable, Project, TeamMember, MonthlyAllocation, RaidItem, RaidType, ImpactLevel, ProbabilityLevel, RoamStatus, KnowledgeDoc, KnowledgeCategory };
+import { KnowledgeDoc, KnowledgeCategory, SopArticle } from './types/knowledge';
+export type { ProjectDeliverable, Project, TeamMember, MonthlyAllocation, RaidItem, RaidType, ImpactLevel, ProbabilityLevel, RoamStatus, KnowledgeDoc, KnowledgeCategory, SopArticle };
 
 export type Task = Tache;
 
