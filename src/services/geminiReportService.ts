@@ -1,4 +1,4 @@
-import { Tache, Projet } from '../types';
+import { Tache, Projet, ActivityLog } from '../types';
 import { scrubSensitiveEntities, sanitizeUserIdentity } from '../utils/aiSanitizer';
 
 export interface PreparedTaskReportItem {
@@ -280,6 +280,7 @@ export async function generateActivityReport(params: {
   perimetre?: 'tous' | 'projet';
   projetSelectionneId?: string;
   cible?: 'n1' | 'codir';
+  activityLogs?: ActivityLog[];
 }): Promise<GenerateReportResult> {
   const {
     tasks,
@@ -291,6 +292,7 @@ export async function generateActivityReport(params: {
     perimetre = 'tous',
     projetSelectionneId,
     cible = 'n1',
+    activityLogs = [],
   } = params;
 
   // 1. Préparer les données en fonction du périmètre
@@ -403,6 +405,21 @@ RÈGLES DE RÉDACTION :
 - notes = Liste de commentaires ou suivis récents`;
 
   let userPrompt = `${legendInfo}\n\nVoici les données d'activité compressées et allégées des ${preparedTasks.length} tâches actives sur la période :\n\n${JSON.stringify(lightenedTasks, null, 2)}\n\n`;
+
+  // Compression des journaux d'activité globale pour alimenter l'analyse IA
+  if (activityLogs && activityLogs.length > 0) {
+    const spaceLogs = activityLogs
+      .filter((l) => l.spaceId === spaceId)
+      .slice(0, 40) // Économie de coûts : On limite aux 40 actions les plus récentes
+      .map((l) => ({
+        tâche: l.taskTitle,
+        action: l.type,
+        détail: l.details,
+        date: l.timestamp.substring(0, 10)
+      }));
+
+    userPrompt += `Voici également le HISTORIQUE CHRONOLOGIQUE DES ACTIONS (Timeline) de l'espace :\n\n${JSON.stringify(spaceLogs, null, 2)}\n\nIMPORTANT : Appuie-toi sur cette chronologie d'activité pour illustrer la dynamique opérationnelle et les transitions de statut majeures.\n\n`;
+  }
 
   if (compressedRaidItems.length > 0) {
     userPrompt += `Voici également les ÉLÉMENTS DE RISQUE MAJEURS & PROBLÈMES CRITIQUES (RAID Log) actifs pour ce périmètre (score de criticité >= 6 ou statut 'issue' ouvert) :\n\n${JSON.stringify(compressedRaidItems, null, 2)}\n\nIMPORTANT : Utilise impérativement ces données de risque/problèmes pour enrichir la section "Points d'attention" ou "ANALYSE DES RISQUES ET IMPACTS MAJEURS" du rapport, en intégrant leur impact et le plan de mitigation proposé.\n\n`;

@@ -19,7 +19,8 @@ import {
   Shield,
   LayoutGrid,
 } from 'lucide-react';
-import { Tache, Projet, Espace, StatutTache, ProjectDeliverable, TeamMember, MonthlyAllocation, RaidItem } from './types';
+import { Tache, Projet, Espace, StatutTache, ProjectDeliverable, TeamMember, MonthlyAllocation, RaidItem, ActivityLog, Milestone, ProjectPhase } from './types';
+import { fetchActivityLogs, logActivity } from './services/activityLogService';
 import {
   DEFAULT_SPACE_ID,
   getDefaultSpaces,
@@ -33,6 +34,10 @@ import {
   saveUserTasksToStorage,
   loadUserProjectsFromStorage,
   saveUserProjectsToStorage,
+  loadUserMilestonesFromStorage,
+  saveUserMilestonesToStorage,
+  loadUserPhasesFromStorage,
+  saveUserPhasesToStorage,
   exportDataAsJson,
   validateImportData,
   getTodayDateString,
@@ -59,6 +64,10 @@ import {
   deleteProjectFromFirestore,
   batchUpdateTasksInFirestore,
   importDataToFirestore,
+  saveMilestoneToFirestore,
+  deleteMilestoneFromFirestore,
+  savePhaseToFirestore,
+  deletePhaseFromFirestore,
 } from './services/firestoreService';
 import { useAuth } from './context/AuthContext';
 import { AuthScreen } from './components/AuthScreen';
@@ -181,6 +190,24 @@ export default function App() {
               console.error('Erreur Firestore mise à jour titre:', err);
             });
           }
+
+          // Enregistrer le log de modification de titre
+          if (user) {
+            const associatedProj = projects.find((p) => p.id === updated.projetId);
+            logActivity(
+              user.uid,
+              updated.spaceId,
+              updated.id,
+              newTitle,
+              'UPDATED',
+              `Titre modifié de "${t.titre}" à "${newTitle}"`,
+              updated.projetId,
+              associatedProj?.nom || null
+            ).then((newLog) => {
+              setActivityLogs((prev) => [newLog, ...prev]);
+            }).catch(err => console.error(err));
+          }
+
           return updated;
         }
         return t;
@@ -315,6 +342,9 @@ export default function App() {
   const [editingTask, setEditingTask] = useState<Tache | null>(null);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [selectedProjectDetail, setSelectedProjectDetail] = useState<Projet | null>(null);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [phases, setPhases] = useState<ProjectPhase[]>([]);
 
   // Modale Tâches récurrentes planifiées (inspiration Outlook)
   const [recurringTemplates, setRecurringTemplates] = useState<RecurringTaskTemplate[]>([]);
@@ -504,6 +534,8 @@ export default function App() {
     const localCachedSpaces = loadUserSpacesFromStorage(currentUserId);
     const localCachedTasks = loadUserTasksFromStorage(currentUserId);
     const localCachedProj = loadUserProjectsFromStorage(currentUserId);
+    const localCachedMilestones = loadUserMilestonesFromStorage(currentUserId);
+    const localCachedPhases = loadUserPhasesFromStorage(currentUserId);
     const localActiveSpaceId = loadActiveSpaceId(currentUserId);
 
     if (localCachedSpaces.length > 0) {
@@ -516,6 +548,8 @@ export default function App() {
     }
     if (localCachedTasks.length > 0) setTasks(localCachedTasks);
     if (localCachedProj.length > 0) setProjects(localCachedProj);
+    if (localCachedMilestones.length > 0) setMilestones(localCachedMilestones);
+    if (localCachedPhases.length > 0) setPhases(localCachedPhases);
 
     // 1. Initialise l'espace Firestore personnel s'il est vierge
     initializeUserInitialDataIfEmpty(currentUserId).catch((err) => {
@@ -548,6 +582,18 @@ export default function App() {
           });
         }
       },
+      (remoteMilestones) => {
+        if (!isMounted) return;
+        setMilestones(remoteMilestones);
+        saveUserMilestonesToStorage(currentUserId, remoteMilestones);
+        setIsCloudSyncing(false);
+      },
+      (remotePhases) => {
+        if (!isMounted) return;
+        setPhases(remotePhases);
+        saveUserPhasesToStorage(currentUserId, remotePhases);
+        setIsCloudSyncing(false);
+      },
       (syncErr) => {
         console.error('Erreur synchronisation Firestore:', syncErr);
         if (isMounted) {
@@ -555,9 +601,13 @@ export default function App() {
           const fallbackSpaces = loadUserSpacesFromStorage(currentUserId);
           const fallbackTasks = loadUserTasksFromStorage(currentUserId);
           const fallbackProj = loadUserProjectsFromStorage(currentUserId);
+          const fallbackMilestones = loadUserMilestonesFromStorage(currentUserId);
+          const fallbackPhases = loadUserPhasesFromStorage(currentUserId);
           if (fallbackSpaces.length > 0) setSpaces(fallbackSpaces);
           if (fallbackTasks.length > 0) setTasks(fallbackTasks);
           if (fallbackProj.length > 0) setProjects(fallbackProj);
+          if (fallbackMilestones.length > 0) setMilestones(fallbackMilestones);
+          if (fallbackPhases.length > 0) setPhases(fallbackPhases);
           showToast('Mode hors-ligne : données locales actives.', 'error');
         }
       }
@@ -583,6 +633,21 @@ export default function App() {
     return () => {
       unsubscribe();
     };
+  }, [user, isApproved]);
+
+  // Chargement initial des logs d'activité globale
+  useEffect(() => {
+    if (!user || !isApproved) {
+      setActivityLogs([]);
+      return;
+    }
+    fetchActivityLogs(user.uid)
+      .then((logs) => {
+        setActivityLogs(logs);
+      })
+      .catch((err) => {
+        console.error('Erreur chargement logs d\'activité:', err);
+      });
   }, [user, isApproved]);
 
   // Chargement automatique des imputations du mois courant pour le Health Check
@@ -944,6 +1009,23 @@ export default function App() {
 
     setTasks((prev) => prev.map((t) => (t.id === task.id ? updatedTask : t)));
 
+    // Enregistrer le log de réouverture de la tâche
+    if (user) {
+      const associatedProj = projects.find((p) => p.id === updatedTask.projetId);
+      logActivity(
+        user.uid,
+        updatedTask.spaceId,
+        updatedTask.id,
+        updatedTask.titre,
+        'STATUS_CHANGED',
+        'Tâche réouverte depuis les archives.',
+        updatedTask.projetId,
+        associatedProj?.nom || null
+      ).then((newLog) => {
+        setActivityLogs((prev) => [newLog, ...prev]);
+      }).catch(err => console.error(err));
+    }
+
     if (user && !user.isLocalFallback) {
       saveTaskToFirestore(user.uid, updatedTask)
         .then(() => {
@@ -1009,6 +1091,23 @@ export default function App() {
 
     setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
 
+    // Enregistrer le log de changement de statut
+    if (user) {
+      const associatedProj = projects.find((p) => p.id === updatedTask.projetId);
+      logActivity(
+        user.uid,
+        updatedTask.spaceId,
+        updatedTask.id,
+        updatedTask.titre,
+        'STATUS_CHANGED',
+        `Statut modifié : ${target.statut} ➔ ${newStatus}${additionalComment ? ` (${additionalComment})` : ''}`,
+        updatedTask.projetId,
+        associatedProj?.nom || null
+      ).then((newLog) => {
+        setActivityLogs((prev) => [newLog, ...prev]);
+      }).catch(err => console.error(err));
+    }
+
     if (user && !user.isLocalFallback) {
       saveTaskToFirestore(user.uid, updatedTask).catch((err) => {
         console.error('Erreur Firestore statut:', err);
@@ -1055,6 +1154,23 @@ export default function App() {
 
     setTasks((prev) => prev.map((t) => (t.id === taskId ? updatedTask : t)));
 
+    // Enregistrer le log de commentaire ajouté
+    if (user) {
+      const associatedProj = projects.find((p) => p.id === updatedTask.projetId);
+      logActivity(
+        user.uid,
+        updatedTask.spaceId,
+        updatedTask.id,
+        updatedTask.titre,
+        'COMMENT_ADDED',
+        `Nouveau commentaire : "${commentText.substring(0, 60)}${commentText.length > 60 ? '...' : ''}"`,
+        updatedTask.projetId,
+        associatedProj?.nom || null
+      ).then((newLog) => {
+        setActivityLogs((prev) => [newLog, ...prev]);
+      }).catch(err => console.error(err));
+    }
+
     if (user && !user.isLocalFallback) {
       saveTaskToFirestore(user.uid, updatedTask).catch((err) => {
         console.error('Erreur Firestore ajout commentaire:', err);
@@ -1069,6 +1185,7 @@ export default function App() {
     titre: string;
     description: string;
     projetId: string | null;
+    phaseId?: string | null;
     jiraKey?: string;
     statut: StatutTache;
     dateEcheance?: string | null;
@@ -1095,6 +1212,7 @@ export default function App() {
 
       updatedTask = {
         ...updatedTask,
+        phaseId: taskData.phaseId || null,
         jiraKey: taskData.jiraKey,
         userId: user?.uid || editingTask.userId,
         spaceId: editingTask.spaceId || currentSpace.id,
@@ -1103,6 +1221,45 @@ export default function App() {
       };
 
       setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? updatedTask : t)));
+
+      // Enregistrer le log de modification de la tâche
+      if (user) {
+        const changes: string[] = [];
+        if (editingTask.titre !== taskData.titre) {
+          changes.push(`Titre modifié de "${editingTask.titre}" à "${taskData.titre}"`);
+        }
+        if ((editingTask.description || '') !== (taskData.description || '')) {
+          changes.push(`Description mise à jour`);
+        }
+        if (editingTask.statut !== taskData.statut) {
+          changes.push(`Statut modifié de "${editingTask.statut}" à "${taskData.statut}"`);
+        }
+        if (editingTask.dateEcheance !== taskData.dateEcheance) {
+          const oldDate = editingTask.dateEcheance || 'Aucune';
+          const newDate = taskData.dateEcheance || 'Aucune';
+          changes.push(`Date d'échéance modifiée de "${oldDate}" à "${newDate}"`);
+        }
+        if (editingTask.projetId !== taskData.projetId) {
+          const oldProj = projects.find(p => p.id === editingTask.projetId)?.nom || 'Aucun';
+          const newProj = projects.find(p => p.id === taskData.projetId)?.nom || 'Aucun';
+          changes.push(`Projet réassigné de "${oldProj}" à "${newProj}"`);
+        }
+
+        const detailsText = changes.length > 0 ? changes.join(', ') : "Détails de la tâche mis à jour";
+        const associatedProj = projects.find((p) => p.id === updatedTask.projetId);
+        logActivity(
+          user.uid,
+          updatedTask.spaceId,
+          updatedTask.id,
+          updatedTask.titre,
+          'UPDATED',
+          detailsText,
+          updatedTask.projetId,
+          associatedProj?.nom || null
+        ).then((newLog) => {
+          setActivityLogs((prev) => [newLog, ...prev]);
+        }).catch(err => console.error(err));
+      }
 
       if (user && !user.isLocalFallback) {
         saveTaskToFirestore(user.uid, updatedTask).catch((err) => {
@@ -1136,6 +1293,10 @@ export default function App() {
         initialComments: comments,
       });
 
+      if (taskData.phaseId) {
+        newTask.phaseId = taskData.phaseId;
+      }
+
       if (taskData.jiraKey) {
         newTask.jiraKey = taskData.jiraKey;
       }
@@ -1145,6 +1306,23 @@ export default function App() {
       }
 
       setTasks((prev) => [newTask, ...prev]);
+
+      // Enregistrer le log de création de tâche
+      if (user) {
+        const associatedProj = projects.find((p) => p.id === newTask.projetId);
+        logActivity(
+          user.uid,
+          newTask.spaceId,
+          newTask.id,
+          newTask.titre,
+          'CREATED',
+          `Tâche créée. Statut initial: ${newTask.statut}`,
+          newTask.projetId,
+          associatedProj?.nom || null
+        ).then((newLog) => {
+          setActivityLogs((prev) => [newLog, ...prev]);
+        }).catch(err => console.error(err));
+      }
 
       if (user && !user.isLocalFallback) {
         saveTaskToFirestore(user.uid, newTask).catch((err) => {
@@ -1341,6 +1519,70 @@ export default function App() {
     }
 
     showToast(`Projet « ${nom} » créé dans « ${currentSpace.nom} ».`);
+  };
+
+  // Jalons (Milestones) : CRUD
+  const handleSaveMilestone = (milestone: Milestone) => {
+    setMilestones((prev) => {
+      const exists = prev.some((m) => m.id === milestone.id);
+      const next = exists
+        ? prev.map((m) => (m.id === milestone.id ? milestone : m))
+        : [milestone, ...prev];
+      if (user) saveUserMilestonesToStorage(user.uid, next);
+      return next;
+    });
+
+    if (user && !user.isLocalFallback) {
+      saveMilestoneToFirestore(user.uid, milestone).catch((err) => {
+        console.error('Erreur Firestore jalon:', err);
+      });
+    }
+  };
+
+  const handleDeleteMilestone = (milestoneId: string) => {
+    setMilestones((prev) => {
+      const next = prev.filter((m) => m.id !== milestoneId);
+      if (user) saveUserMilestonesToStorage(user.uid, next);
+      return next;
+    });
+
+    if (user && !user.isLocalFallback) {
+      deleteMilestoneFromFirestore(user.uid, milestoneId).catch((err) => {
+        console.error('Erreur Firestore suppression jalon:', err);
+      });
+    }
+  };
+
+  // Phases de projet (ProjectPhase) : CRUD
+  const handleSavePhase = (phase: ProjectPhase) => {
+    setPhases((prev) => {
+      const exists = prev.some((p) => p.id === phase.id);
+      const next = exists
+        ? prev.map((p) => (p.id === phase.id ? phase : p))
+        : [...prev, phase];
+      if (user) saveUserPhasesToStorage(user.uid, next);
+      return next;
+    });
+
+    if (user && !user.isLocalFallback) {
+      savePhaseToFirestore(user.uid, phase).catch((err) => {
+        console.error('Erreur Firestore phase:', err);
+      });
+    }
+  };
+
+  const handleDeletePhase = (phaseId: string) => {
+    setPhases((prev) => {
+      const next = prev.filter((p) => p.id !== phaseId);
+      if (user) saveUserPhasesToStorage(user.uid, next);
+      return next;
+    });
+
+    if (user && !user.isLocalFallback) {
+      deletePhaseFromFirestore(user.uid, phaseId).catch((err) => {
+        console.error('Erreur Firestore suppression phase:', err);
+      });
+    }
   };
 
   // Projets : Mise à jour dans l'espace actif
@@ -1926,6 +2168,7 @@ export default function App() {
             projects={currentSpaceProjects}
             activeSpace={currentSpace}
             onOpenActivityReportModal={handleOpenActivityReportModal}
+            activityLogs={activityLogs}
           />
         )}
       </main>
@@ -1962,6 +2205,8 @@ export default function App() {
         initialTask={editingTask}
         defaultStatus={taskModalDefaultStatus}
         projects={currentSpaceProjects}
+        phases={phases}
+        activityLogs={activityLogs}
         onSave={handleSaveTask}
         onClose={() => {
           setIsTaskModalOpen(false);
@@ -2005,8 +2250,15 @@ export default function App() {
         isOpen={selectedProjectDetail !== null}
         project={selectedProjectDetail}
         tasks={tasks}
+        milestones={milestones}
+        phases={phases}
         onClose={() => setSelectedProjectDetail(null)}
         onUpdateProject={handleUpdateProject}
+        onSaveMilestone={handleSaveMilestone}
+        onDeleteMilestone={handleDeleteMilestone}
+        onSavePhase={handleSavePhase}
+        onDeletePhase={handleDeletePhase}
+        onUpdateTask={handleSaveTask}
       />
 
       {/* MODALE GESTION DES ESPACES DE TRAVAIL (CRUD WORKSPACES) */}

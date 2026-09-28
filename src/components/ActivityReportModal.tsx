@@ -17,7 +17,7 @@ import {
   Users,
 } from 'lucide-react';
 import Markdown from 'react-markdown';
-import { Tache, Projet, Espace } from '../types';
+import { Tache, Projet, Espace, ActivityLog } from '../types';
 import {
   getMondayOfCurrentWeek,
   formatLocalDate,
@@ -36,6 +36,7 @@ export interface ActivityReportModalProps {
   activeSpace: Espace;
   initialStartDate?: string;
   initialEndDate?: string;
+  activityLogs?: ActivityLog[];
 }
 
 export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
@@ -46,6 +47,7 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
   activeSpace,
   initialStartDate,
   initialEndDate,
+  activityLogs,
 }) => {
   const modalId = useId();
   const ActiveSpaceIcon = getWorkspaceIconComponent(activeSpace.icone);
@@ -158,6 +160,7 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
         perimetre,
         projetSelectionneId: perimetre === 'projet' ? projetSelectionneId : undefined,
         cible,
+        activityLogs,
       });
 
       if (result.success && result.reportText) {
@@ -568,28 +571,85 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
 
           {/* ÉCRAN INITIAL : Aucune génération lancée */}
           {!isLoading && !reportResult && !errorMessage && (
-            <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-[#6B8E78] border border-[#F0EFEB] shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
-                <FolderGit2 className="h-6 w-6" />
+            <div className="space-y-6">
+              <div className="flex flex-col items-center justify-center py-6 text-center space-y-3 bg-white rounded-2xl border border-[#F0EFEB] p-5 shadow-xs">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#6B8E78]/10 text-[#6B8E78] border border-[#6B8E78]/20">
+                  <FolderGit2 className="h-5 w-5" />
+                </div>
+                <div className="max-w-md space-y-1">
+                  <h4 className="text-sm font-medium text-[#1A1D1A]">
+                    Prêt à générer votre compte-rendu d&apos;activité
+                  </h4>
+                  <p className="text-xs text-[#737873] leading-relaxed font-light">
+                    {matchingTasks.length > 0 ? (
+                      <>
+                        <strong>{matchingTasks.length} tâche(s)</strong> actives ou modifiées identifiées
+                        sur cette période. Cliquez sur <strong>« Générer le rapport IA »</strong> pour
+                        obtenir une synthèse structurée pour votre <strong>{cible === 'n1' ? 'responsable direct (N+1)' : 'Comité de Direction (CODIR)'}</strong>.
+                      </>
+                    ) : (
+                      <>
+                        Aucune activité enregistrée sur cette période pour le périmètre sélectionné.
+                        Ajustez les dates ou changez de projet ci-dessus.
+                      </>
+                    )}
+                  </p>
+                </div>
               </div>
-              <div className="max-w-md space-y-1">
-                <h4 className="text-sm font-medium text-[#1A1D1A]">
-                  Prêt à générer votre compte-rendu d&apos;activité
-                </h4>
-                <p className="text-xs text-[#737873] leading-relaxed font-light">
-                  {matchingTasks.length > 0 ? (
-                    <>
-                      <strong>{matchingTasks.length} tâche(s)</strong> actives ou modifiées identifiées
-                      sur cette période. Cliquez sur <strong>« Générer le rapport IA »</strong> pour
-                      obtenir une synthèse structurée pour votre <strong>{cible === 'n1' ? 'responsable direct (N+1)' : 'Comité de Direction (CODIR)'}</strong>.
-                    </>
-                  ) : (
-                    <>
-                      Aucune activité enregistrée sur cette période pour le périmètre sélectionné.
-                      Ajustez les dates ou changez de projet ci-dessus.
-                    </>
-                  )}
-                </p>
+
+              {/* TIMELINE D'ACTIVITÉ EN DIRECT CLOISONNÉE PAR SPACEID */}
+              <div className="bg-white rounded-2xl border border-[#F0EFEB] p-5 space-y-4 shadow-xs">
+                <div className="flex items-center justify-between border-b border-[#F0EFEB] pb-3">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-[#6B8E78]" />
+                    <h5 className="text-xs font-bold text-[#1A1D1A]">
+                      Fil d&apos;activité en temps réel (Espace : {activeSpace.nom})
+                    </h5>
+                  </div>
+                  <span className="text-[10px] bg-[#FAF9F6] border border-[#F0EFEB] text-[#737873] px-2.5 py-0.5 rounded-full font-bold">
+                    {((activityLogs || []).filter((l) => l.spaceId === activeSpace.id)).length} action(s)
+                  </span>
+                </div>
+
+                {((activityLogs || []).filter((l) => l.spaceId === activeSpace.id)).length === 0 ? (
+                  <p className="text-center py-6 text-xs text-[#737873] font-light">
+                    Aucun événement d&apos;activité tracé pour le moment sur cet espace de travail.
+                  </p>
+                ) : (
+                  <div className="relative border-l border-[#F0EFEB] ml-2.5 pl-5 space-y-4 py-1">
+                    {(activityLogs || [])
+                      .filter((l) => l.spaceId === activeSpace.id)
+                      .slice(0, 10)
+                      .map((log) => {
+                        let typeColor = 'bg-[#6B8E78]';
+                        if (log.type === 'CREATED') typeColor = 'bg-blue-500';
+                        else if (log.type === 'STATUS_CHANGED') typeColor = 'bg-[#C89B7B]';
+                        else if (log.type === 'COMMENT_ADDED') typeColor = 'bg-purple-500';
+
+                        return (
+                          <div key={log.id} className="relative group text-xs">
+                            {/* Point sur la ligne de temps */}
+                            <div className={`absolute -left-[25px] top-1 h-2.5 w-2.5 rounded-full ${typeColor} ring-4 ring-white`} />
+
+                            <div className="flex items-center justify-between gap-2 text-[10px] text-[#737873] font-medium">
+                              <span className="font-semibold text-[9px] uppercase font-mono tracking-wider">
+                                {log.type === 'CREATED' ? 'Création' : log.type === 'STATUS_CHANGED' ? 'Changement de statut' : log.type === 'COMMENT_ADDED' ? 'Commentaire' : 'Mise à jour'}
+                              </span>
+                              <span>{new Date(log.timestamp).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+
+                            <h6 className="font-bold text-[#1A1D1A] mt-0.5 group-hover:text-[#6B8E78] transition-colors">
+                              {log.taskTitle}
+                            </h6>
+
+                            <p className="text-[11px] text-[#737873] font-light mt-0.5 leading-relaxed bg-[#FAF9F6]/50 rounded-lg p-2 border border-[#F0EFEB]/30">
+                              {log.details}
+                            </p>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
               </div>
             </div>
           )}

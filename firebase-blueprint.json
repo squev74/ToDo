@@ -58,6 +58,8 @@
         "description": { "type": "string" },
         "statut": { "type": "string" },
         "projetId": { "type": "string" },
+        "phaseId": { "type": "string" },
+        "jiraKey": { "type": "string" },
         "spaceId": { "type": "string" },
         "dateEcheance": { "type": "string" },
         "dateRealisation": { "type": "string" },

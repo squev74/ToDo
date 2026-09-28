@@ -12,7 +12,7 @@ import {
   Check,
   Sparkles,
 } from 'lucide-react';
-import { Tache, Projet, Espace } from '../types';
+import { Tache, Projet, Espace, ActivityLog } from '../types';
 import { getTodayDateString } from '../utils/storage';
 import { getWorkspaceIconComponent } from '../utils/workspaceIcons';
 import { EmailInboxAlert } from './EmailInboxAlert';
@@ -22,6 +22,7 @@ interface DailyReportPanelProps {
   projects: Projet[];
   activeSpace?: Espace;
   onOpenActivityReportModal?: (startDate?: string, endDate?: string) => void;
+  activityLogs?: ActivityLog[];
 }
 
 function formatLocalDate(d: Date): string {
@@ -36,6 +37,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
   projects,
   activeSpace,
   onOpenActivityReportModal,
+  activityLogs = [],
 }) => {
   const todayStr = useMemo(() => getTodayDateString(), []);
   const ActiveSpaceIcon = activeSpace ? getWorkspaceIconComponent(activeSpace.icone) : null;
@@ -124,7 +126,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
       });
   }, [tasks, effectiveStart, effectiveEnd]);
 
-  // 3. Commentaires & notes saisis dans l'intervalle sélectionné sur toutes les tâches
+  // 3. Commentaires & notes et Historique transverse d'activité (Créations, Statuts, Titres, Descriptions, Échéances)
   interface CommentReportItem {
     id: string;
     taskTitle: string;
@@ -133,10 +135,14 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
     project?: Projet;
     texte: string;
     date: string;
+    type?: 'COMMENT' | 'CREATED' | 'STATUS_CHANGED' | 'UPDATED';
+    badgeText?: string;
   }
 
   const commentsInPeriod = useMemo(() => {
     const list: CommentReportItem[] = [];
+
+    // Ajouter les commentaires saisis
     tasks.forEach((task) => {
       const proj = task.projetId ? projectsMap.get(task.projetId) : undefined;
       task.commentaires?.forEach((comm) => {
@@ -150,12 +156,57 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
             project: proj,
             texte: comm.texte,
             date: comm.date,
+            type: 'COMMENT',
+            badgeText: 'Commentaire',
           });
         }
       });
     });
+
+    // Ajouter les logs transverses (Créations, Changements de statuts, modifications de titre, description, due date)
+    activityLogs.forEach((log) => {
+      // Filtrer par espace si nécessaire
+      if (activeSpace && log.spaceId !== activeSpace.id) {
+        return;
+      }
+
+      const logDate = log.timestamp.split('T')[0];
+      if (logDate >= effectiveStart && logDate <= effectiveEnd) {
+        // Éviter les doublons avec les commentaires directs
+        if (log.type === 'COMMENT_ADDED') {
+          return;
+        }
+
+        let badge = 'Modification';
+        if (log.type === 'CREATED') badge = 'Création';
+        else if (log.type === 'STATUS_CHANGED') badge = 'Statut';
+        else if (log.type === 'UPDATED') {
+          // Extraire un badge plus explicite selon le texte du détail
+          if (log.details.toLowerCase().includes('titre')) badge = 'Titre';
+          else if (log.details.toLowerCase().includes('description')) badge = 'Description';
+          else if (log.details.toLowerCase().includes('échéance') || log.details.toLowerCase().includes('date')) badge = 'Échéance';
+          else badge = 'Mise à jour';
+        }
+
+        const proj = log.projectId ? projectsMap.get(log.projectId) : undefined;
+        const task = tasks.find((t) => t.id === log.taskId);
+
+        list.push({
+          id: log.id,
+          taskTitle: log.taskTitle,
+          taskId: log.taskId,
+          taskStatus: task?.statut || 'Active',
+          project: proj,
+          texte: log.details,
+          date: log.timestamp,
+          type: log.type as any,
+          badgeText: badge,
+        });
+      }
+    });
+
     return list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [tasks, projectsMap, effectiveStart, effectiveEnd]);
+  }, [tasks, activityLogs, activeSpace, projectsMap, effectiveStart, effectiveEnd]);
 
   // Raccourcis d'action rapide
   const applyPreset = (preset: 'today' | 'last7days' | 'thisMonth') => {
@@ -787,39 +838,57 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
             >
               <MessageSquare className="h-7 w-7 text-[#737873]/40 mb-2" />
               <p className="text-xs font-medium text-[#1A1D1A]">
-                Aucune note saisie sur cette période
+                Aucune activité enregistrée sur cette période
               </p>
               <p className="text-[11px] text-[#737873] mt-1 max-w-xs font-light">
-                Aucun commentaire n&apos;a été consigné entre le {formatFrenchDate(effectiveStart)} et le{' '}
+                Aucun événement (création, note, changement de statut, d&apos;échéance, de titre ou de description) n&apos;a été consigné entre le {formatFrenchDate(effectiveStart)} et le{' '}
                 {formatFrenchDate(effectiveEnd)}.
               </p>
             </div>
           ) : (
             <div className="space-y-2.5 overflow-y-auto max-h-96 pr-1">
-              {commentsInPeriod.map((item) => (
-                <div
-                  key={item.id}
-                  id={`report-comment-${item.id}`}
-                  className="rounded-xl border border-[#F0EFEB] bg-white p-3 space-y-1.5 hover:border-[#E2DFD8] transition-colors"
-                >
-                  <div className="flex items-center justify-between gap-2 text-xs">
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <ArrowRight className="h-3 w-3 text-[#737873] shrink-0" />
-                      <span className="font-medium text-[#1A1D1A] truncate" title={item.taskTitle}>
-                        {item.taskTitle}
+              {commentsInPeriod.map((item) => {
+                let badgeBg = 'bg-[#6B8E78]/10 text-[#6B8E78] border-[#6B8E78]/20';
+                if (item.type === 'CREATED') badgeBg = 'bg-blue-50 text-blue-600 border-blue-100';
+                else if (item.type === 'STATUS_CHANGED') badgeBg = 'bg-[#C89B7B]/10 text-[#C89B7B] border-[#C89B7B]/20';
+                else if (item.type === 'UPDATED') badgeBg = 'bg-purple-50 text-purple-600 border-purple-100';
+
+                return (
+                  <div
+                    key={item.id}
+                    id={`report-comment-${item.id}`}
+                    className="rounded-xl border border-[#F0EFEB] bg-white p-3 space-y-1.5 hover:border-[#E2DFD8] transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <ArrowRight className="h-3 w-3 text-[#737873] shrink-0" />
+                        <span className="font-medium text-[#1A1D1A] truncate text-[11px]" title={item.taskTitle}>
+                          {item.taskTitle}
+                        </span>
+                      </div>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-normal text-[#737873] shrink-0">
+                        <Clock className="h-3 w-3 text-[#737873]" />
+                        {formatItemTimestamp(item.date)}
                       </span>
                     </div>
-                    <span className="inline-flex items-center gap-1 text-[10px] font-normal text-[#737873] shrink-0">
-                      <Clock className="h-3 w-3 text-[#737873]" />
-                      {formatItemTimestamp(item.date)}
-                    </span>
-                  </div>
 
-                  <p className="rounded-lg bg-[#F9F8F6] p-2 text-xs text-[#1A1D1A] leading-relaxed whitespace-pre-wrap border border-[#F0EFEB] font-light">
-                    {item.texte}
-                  </p>
-                </div>
-              ))}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded border font-semibold tracking-wider font-sans ${badgeBg}`}>
+                        {item.badgeText || 'Note'}
+                      </span>
+                      {item.project && (
+                        <span className="text-[9px] bg-slate-50 border border-[#F0EFEB] text-[#737873] px-1.5 py-0.5 rounded font-medium">
+                          {item.project.nom}
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="rounded-lg bg-[#F9F8F6] p-2 text-xs text-[#1A1D1A] leading-relaxed whitespace-pre-wrap border border-[#F0EFEB] font-light">
+                      {item.texte}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

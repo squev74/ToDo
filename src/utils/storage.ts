@@ -1,4 +1,4 @@
-import { Tache, Projet, Espace, AppDataExport, UserProfile } from '../types';
+import { Tache, Projet, Espace, AppDataExport, UserProfile, Milestone, ProjectPhase } from '../types';
 
 export const DEFAULT_SPACE_ID = 'space-default';
 
@@ -214,7 +214,7 @@ export function getDefaultTasks(
 }
 
 // Clés de stockage isolées par identifiant utilisateur (multi-tenant)
-function getUserStorageKey(userId: string, resource: 'tasks' | 'projects' | 'spaces' | 'activeSpace'): string {
+function getUserStorageKey(userId: string, resource: 'tasks' | 'projects' | 'spaces' | 'activeSpace' | 'milestones' | 'phases'): string {
   const safeId = userId.replace(/[^a-zA-Z0-9_-]/g, '_');
   return `todolist_${resource}_user_${safeId}`;
 }
@@ -341,6 +341,64 @@ export function saveUserProjectsToStorage(userId: string, projects: Projet[]): v
   }
 }
 
+// Chargement des jalons isolés de l'utilisateur
+export function loadUserMilestonesFromStorage(userId: string): Milestone[] {
+  if (!userId) return [];
+  try {
+    const raw = localStorage.getItem(getUserStorageKey(userId, 'milestones'));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((m) => ({
+        ...m,
+        spaceId: m.spaceId || DEFAULT_SPACE_ID,
+      }));
+    }
+  } catch (err) {
+    console.error('Erreur chargement jalons locaux:', err);
+  }
+  return [];
+}
+
+// Sauvegarde des jalons isolés de l'utilisateur
+export function saveUserMilestonesToStorage(userId: string, milestones: Milestone[]): void {
+  if (!userId) return;
+  try {
+    localStorage.setItem(getUserStorageKey(userId, 'milestones'), JSON.stringify(milestones));
+  } catch (err) {
+    console.error('Erreur sauvegarde jalons locaux:', err);
+  }
+}
+
+// Chargement des phases isolées de l'utilisateur
+export function loadUserPhasesFromStorage(userId: string): ProjectPhase[] {
+  if (!userId) return [];
+  try {
+    const raw = localStorage.getItem(getUserStorageKey(userId, 'phases'));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.map((p) => ({
+        ...p,
+        spaceId: p.spaceId || DEFAULT_SPACE_ID,
+      }));
+    }
+  } catch (err) {
+    console.error('Erreur chargement phases locales:', err);
+  }
+  return [];
+}
+
+// Sauvegarde des phases isolées de l'utilisateur
+export function saveUserPhasesToStorage(userId: string, phases: ProjectPhase[]): void {
+  if (!userId) return;
+  try {
+    localStorage.setItem(getUserStorageKey(userId, 'phases'), JSON.stringify(phases));
+  } catch (err) {
+    console.error('Erreur sauvegarde phases locales:', err);
+  }
+}
+
 // Nettoyage complet des données en cache pour un utilisateur
 export function clearUserStorage(userId: string): void {
   if (!userId) return;
@@ -349,6 +407,8 @@ export function clearUserStorage(userId: string): void {
     localStorage.removeItem(getUserStorageKey(userId, 'projects'));
     localStorage.removeItem(getUserStorageKey(userId, 'spaces'));
     localStorage.removeItem(getUserStorageKey(userId, 'activeSpace'));
+    localStorage.removeItem(getUserStorageKey(userId, 'milestones'));
+    localStorage.removeItem(getUserStorageKey(userId, 'phases'));
   } catch (err) {
     console.error('Erreur nettoyage données locales:', err);
   }

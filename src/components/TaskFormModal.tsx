@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, Folder, Tag, AlertCircle, MessageSquare, Send, User, Clock } from 'lucide-react';
-import { Tache, Projet, StatutTache } from '../types';
+import { Tache, Projet, StatutTache, ActivityLog, ProjectPhase } from '../types';
 import { AiTaskRefiner } from './AiTaskRefiner';
 
 interface TaskFormModalProps {
@@ -8,10 +8,13 @@ interface TaskFormModalProps {
   initialTask?: Tache | null;
   defaultStatus?: StatutTache;
   projects: Projet[];
+  phases: ProjectPhase[];
+  activityLogs?: ActivityLog[];
   onSave: (taskData: {
     titre: string;
     description: string;
     projetId: string | null;
+    phaseId?: string | null;
     jiraKey?: string;
     statut: StatutTache;
     dateEcheance?: string | null;
@@ -27,6 +30,8 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   initialTask,
   defaultStatus,
   projects,
+  phases = [],
+  activityLogs,
   onSave,
   onClose,
   onAddComment,
@@ -34,12 +39,14 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
   const [titre, setTitre] = useState('');
   const [description, setDescription] = useState('');
   const [projetId, setProjetId] = useState<string | null>(null);
+  const [phaseId, setPhaseId] = useState<string | null>(null);
   const [jiraKey, setJiraKey] = useState('');
   const [statut, setStatut] = useState<StatutTache>(defaultStatus || 'Open');
   const [dateEcheance, setDateEcheance] = useState('');
   const [blockedReason, setBlockedReason] = useState('');
   const [activationDate, setActivationDate] = useState('');
   const [error, setError] = useState('');
+  const [activeRightTab, setActiveRightTab] = useState<'comments' | 'timeline'>('comments');
 
   // Saisie du nouveau commentaire
   const [newCommentText, setNewCommentText] = useState('');
@@ -50,6 +57,7 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       setTitre(initialTask.titre);
       setDescription(initialTask.description || '');
       setProjetId(initialTask.projetId || null);
+      setPhaseId(initialTask.phaseId || null);
       setJiraKey(initialTask.jiraKey || '');
       setStatut(initialTask.statut);
       setDateEcheance(initialTask.dateEcheance || '');
@@ -58,7 +66,9 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
     } else {
       setTitre('');
       setDescription('');
-      setProjetId(projects.length > 0 ? projects[0].id : null);
+      const defaultProjId = projects.length > 0 ? projects[0].id : null;
+      setProjetId(defaultProjId);
+      setPhaseId(null);
       setJiraKey('');
       setStatut(defaultStatus || 'Open');
       setDateEcheance('');
@@ -90,11 +100,15 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       return;
     }
 
+    const selectedPhase = phases.find((p) => p.id === phaseId);
+    const finalJiraKey = selectedPhase?.jiraEpicKey || jiraKey;
+
     onSave({
       titre: titre.trim(),
       description: description.trim(),
       projetId: projetId || null,
-      jiraKey: jiraKey.trim() || undefined,
+      phaseId: phaseId || null,
+      jiraKey: finalJiraKey.trim() || undefined,
       statut,
       dateEcheance: dateEcheance.trim() ? dateEcheance.trim() : null,
       blockedReason: statut === 'Blocked' ? blockedReason.trim() : undefined,
@@ -123,6 +137,14 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
       return dateStr;
     }
   };
+
+  const projectPhases = projetId ? (phases || []).filter((p) => p.projectId === projetId) : [];
+  const selectedPhase = phases.find((p) => p.id === phaseId);
+  const isTaskDateExceeded = !!(
+    selectedPhase &&
+    dateEcheance &&
+    (dateEcheance < selectedPhase.startDate || dateEcheance > selectedPhase.endDate)
+  );
 
   return (
     <div
@@ -208,7 +230,10 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
                 <select
                   id="task-project-select"
                   value={projetId || ''}
-                  onChange={(e) => setProjetId(e.target.value ? e.target.value : null)}
+                  onChange={(e) => {
+                    setProjetId(e.target.value ? e.target.value : null);
+                    setPhaseId(null);
+                  }}
                   className="w-full rounded-xl border border-[#F0EFEB] bg-[#F9F8F6] px-3 py-2 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
                 >
                   <option value="">(Aucun projet)</option>
@@ -241,32 +266,48 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             </div>
 
             <div className="rounded-xl border border-[#F0EFEB] bg-[#F9F8F6]/40 p-3.5 space-y-2.5">
-              <label htmlFor="task-jirakey-select" className="block text-xs font-semibold text-[#5B7083]">
-                Imputation JIRA associée (Optionnelle)
+              <label htmlFor="task-phase-select" className="block text-xs font-semibold text-[#5B7083]">
+                Phase de projet associée (dans la roadmap)
               </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <select
-                  id="task-jirakey-select"
-                  value={['EVOLIT-24', 'EVOLIT-94', 'PMOIT-1845', 'Vacances/Maladie', 'PMO-GENERAL'].includes(jiraKey) ? jiraKey : ''}
-                  onChange={(e) => setJiraKey(e.target.value)}
-                  className="rounded-lg border border-[#F0EFEB] bg-white px-2.5 py-1.5 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden"
-                >
-                  <option value="">-- Sélectionner --</option>
-                  <option value="EVOLIT-24">EVOLIT-24 (Produit V24)</option>
-                  <option value="EVOLIT-94">EVOLIT-94 (Performance)</option>
-                  <option value="PMOIT-1845">PMOIT-1845 (Cloud)</option>
-                  <option value="Vacances/Maladie">Absences & Congés</option>
-                  <option value="PMO-GENERAL">PMO & Support</option>
-                </select>
-                <input
-                  id="task-jirakey-input"
-                  type="text"
-                  value={jiraKey}
-                  onChange={(e) => setJiraKey(e.target.value)}
-                  placeholder="Saisir clé JIRA libre (PROJ-123)"
-                  className="rounded-lg border border-[#F0EFEB] bg-white px-3 py-1.5 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden"
-                />
-              </div>
+              <select
+                id="task-phase-select"
+                value={phaseId || ''}
+                onChange={(e) => setPhaseId(e.target.value || null)}
+                className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3 py-2 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden transition-colors"
+                disabled={!projetId}
+              >
+                <option value="">{projetId ? '-- Sélectionner une Phase --' : '(Sélectionnez d’abord un projet)'}</option>
+                {projectPhases.map((ph) => (
+                  <option key={ph.id} value={ph.id}>
+                    {ph.name} ({ph.startDate} au {ph.endDate})
+                  </option>
+                ))}
+              </select>
+
+              {selectedPhase && (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex flex-wrap gap-2 items-center text-[10px] text-[#737873]">
+                    <span className="font-medium text-[#737873]">Période de la phase :</span>
+                    <span className="bg-[#FAF9F6] px-1.5 py-0.5 rounded text-[#1A1D1A] font-mono border border-[#F0EFEB]">
+                      {selectedPhase.startDate} au {selectedPhase.endDate}
+                    </span>
+                    {selectedPhase.jiraEpicKey && (
+                      <span className="flex items-center gap-1 text-[#5B7083] font-semibold bg-blue-50 text-blue-700 border border-blue-100 px-1.5 py-0.5 rounded text-[9px]">
+                        ⚡ Epic JIRA : {selectedPhase.jiraEpicKey}
+                      </span>
+                    )}
+                  </div>
+
+                  {isTaskDateExceeded && (
+                    <div className="flex items-start gap-1.5 p-2 rounded-lg bg-rose-50 border border-rose-100 text-xs text-rose-700 animate-in fade-in slide-in-from-top-1">
+                      <AlertCircle className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5" />
+                      <p className="text-[10px] leading-normal">
+                        <strong>Attention :</strong> La date d’échéance de la tâche ({dateEcheance || 'non définie'}) est en dehors de la période de la phase ({selectedPhase.startDate} au {selectedPhase.endDate}).
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {statut === 'Blocked' && initialTask?.statut !== 'Blocked' && (
@@ -337,50 +378,106 @@ export const TaskFormModal: React.FC<TaskFormModalProps> = ({
             </div>
           </form>
 
-          {/* COLONNE DROITE : Visualisation et saisie de commentaires (Visible uniquement en édition) */}
+          {/* COLONNE DROITE : Visualisation et saisie de commentaires / Timeline d'activité */}
           {initialTask && (
             <div className="md:col-span-5 border-t md:border-t-0 md:border-l border-[#F0EFEB] pt-4 md:pt-0 md:pl-6 flex flex-col h-[520px]">
-              <div className="flex items-center gap-2 pb-3 mb-3 border-b border-[#F0EFEB] shrink-0">
-                <MessageSquare className="h-4.5 w-4.5 text-[#6B8E78]" />
-                <h4 className="text-xs font-semibold text-[#1A1D1A] tracking-wide">
-                  Historique & Commentaires
-                </h4>
-                <span className="inline-flex h-5 items-center justify-center rounded-full bg-slate-100 px-2 text-[10px] font-bold text-[#737873] border border-[#F0EFEB]">
-                  {(initialTask.commentaires || []).length}
-                </span>
+              <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#F0EFEB] shrink-0">
+                <div className="flex items-center gap-1 bg-[#FAF9F6] p-0.5 rounded-lg border border-[#F0EFEB]">
+                  <button
+                    type="button"
+                    onClick={() => setActiveRightTab('comments')}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-md text-[10px] font-bold transition-all ${
+                      activeRightTab === 'comments'
+                        ? 'bg-white text-[#6B8E78] shadow-xs'
+                        : 'text-[#737873] hover:text-[#1A1D1A]'
+                    }`}
+                  >
+                    <MessageSquare className="h-3 w-3" />
+                    <span>Commentaires ({(initialTask.commentaires || []).length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveRightTab('timeline')}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-md text-[10px] font-bold transition-all ${
+                      activeRightTab === 'timeline'
+                        ? 'bg-white text-[#6B8E78] shadow-xs'
+                        : 'text-[#737873] hover:text-[#1A1D1A]'
+                    }`}
+                  >
+                    <Clock className="h-3 w-3" />
+                    <span>Timeline ({(activityLogs || []).filter(l => l.taskId === initialTask.id).length})</span>
+                  </button>
+                </div>
               </div>
 
               {/* Liste des commentaires */}
-              <div className="flex-1 overflow-y-auto space-y-3.5 pr-2 custom-scrollbar min-h-[300px]">
-                {(!initialTask.commentaires || initialTask.commentaires.length === 0) ? (
-                  <div className="h-full flex flex-col items-center justify-center text-center p-4">
-                    <MessageSquare className="h-8 w-8 text-[#D3CFC8] mb-1.5 stroke-[1.5]" />
-                    <p className="text-[11px] font-medium text-[#737873]">Aucun commentaire pour le moment.</p>
-                    <p className="text-[10px] text-[#737873]/60 font-light mt-0.5">Saisissez une note ci-dessous pour lancer la discussion.</p>
-                  </div>
-                ) : (
-                  initialTask.commentaires.map((comm) => (
-                    <div
-                      key={comm.id}
-                      className="rounded-xl border border-[#F0EFEB] bg-[#F9F8F6] p-3 text-xs leading-relaxed transition-all hover:bg-slate-50"
-                    >
-                      <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-[#F0EFEB]/50">
-                        <div className="flex items-center gap-1.5 font-semibold text-[#1A1D1A] text-[11px]">
-                          <User className="h-3 w-3 text-[#737873]" />
-                          <span className="truncate max-w-[120px]">{comm.auteur || 'Collaborateur'}</span>
-                        </div>
-                        <span className="text-[9px] text-[#737873] font-light">
-                          {formatCommentDate(comm.date)}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#1A1D1A] whitespace-pre-wrap font-light font-sans break-words">
-                        {comm.texte}
-                      </p>
+              {activeRightTab === 'comments' && (
+                <div className="flex-1 overflow-y-auto space-y-3.5 pr-2 custom-scrollbar min-h-[300px]">
+                  {(!initialTask.commentaires || initialTask.commentaires.length === 0) ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                      <MessageSquare className="h-8 w-8 text-[#D3CFC8] mb-1.5 stroke-[1.5]" />
+                      <p className="text-[11px] font-medium text-[#737873]">Aucun commentaire pour le moment.</p>
+                      <p className="text-[10px] text-[#737873]/60 font-light mt-0.5">Saisissez une note ci-dessous pour lancer la discussion.</p>
                     </div>
-                  ))
-                )}
-                <div ref={commentsEndRef} />
-              </div>
+                  ) : (
+                    initialTask.commentaires.map((comm) => (
+                      <div
+                        key={comm.id}
+                        className="rounded-xl border border-[#F0EFEB] bg-[#F9F8F6] p-3 text-xs leading-relaxed transition-all hover:bg-slate-50"
+                      >
+                        <div className="flex items-center justify-between gap-2 pb-1.5 mb-1.5 border-b border-[#F0EFEB]/50">
+                          <div className="flex items-center gap-1.5 font-semibold text-[#1A1D1A] text-[11px]">
+                            <User className="h-3 w-3 text-[#737873]" />
+                            <span className="truncate max-w-[120px]">{comm.auteur || 'Collaborateur'}</span>
+                          </div>
+                          <span className="text-[9px] text-[#737873] font-light">
+                            {formatCommentDate(comm.date)}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#1A1D1A] whitespace-pre-wrap font-light font-sans break-words">
+                          {comm.texte}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                  <div ref={commentsEndRef} />
+                </div>
+              )}
+
+              {/* Journal d'activité (Timeline) */}
+              {activeRightTab === 'timeline' && (
+                <div className="flex-1 overflow-y-auto space-y-3.5 pr-2 custom-scrollbar min-h-[300px]">
+                  {(!activityLogs || activityLogs.filter(l => l.taskId === initialTask.id).length === 0) ? (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-4">
+                      <Clock className="h-8 w-8 text-[#D3CFC8] mb-1.5 stroke-[1.5]" />
+                      <p className="text-[11px] font-medium text-[#737873]">Aucun historique d'activité.</p>
+                      <p className="text-[10px] text-[#737873]/60 font-light mt-0.5">Les changements de statut et les éditions de cette tâche apparaîtront ici.</p>
+                    </div>
+                  ) : (
+                    activityLogs
+                      .filter((l) => l.taskId === initialTask.id)
+                      .map((log) => (
+                        <div
+                          key={log.id}
+                          className="rounded-xl border border-[#F0EFEB] bg-[#F9F8F6] p-3 text-xs leading-relaxed transition-all hover:bg-slate-50 relative pl-7"
+                        >
+                          <span className="absolute left-2.5 top-4 w-2 h-2 rounded-full bg-[#6B8E78]" />
+                          <div className="flex items-center justify-between gap-2 pb-1 mb-1 border-b border-[#F0EFEB]/30">
+                            <span className="font-semibold text-[9px] uppercase font-mono tracking-wider text-[#6B8E78]">
+                              {log.type}
+                            </span>
+                            <span className="text-[9px] text-[#737873] font-light">
+                              {formatCommentDate(log.timestamp)}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#1A1D1A] font-light">
+                            {log.details}
+                          </p>
+                        </div>
+                      ))
+                  )}
+                </div>
+              )}
 
               {/* Saisie d'un nouveau commentaire */}
               {onAddComment ? (

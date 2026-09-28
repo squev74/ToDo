@@ -10,9 +10,15 @@ import {
   AlertCircle, 
   ChevronRight, 
   KanbanSquare,
-  ArrowLeft
+  ArrowLeft,
+  Flag,
+  Map,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  Check
 } from 'lucide-react';
-import { Projet, Tache, ProjectDeliverable, TeamMember, MonthlyAllocation, RaidItem } from '../types';
+import { Projet, Tache, ProjectDeliverable, TeamMember, MonthlyAllocation, RaidItem, Milestone, ProjectPhase } from '../types';
 import { ProjectDeliverablesSection } from './ProjectDeliverablesSection';
 import { ProjectMonthlyCapacity } from './ProjectMonthlyCapacity';
 import { ProjectRaidLogSection } from './ProjectRaidLogSection';
@@ -22,6 +28,8 @@ interface ProjectDetailViewProps {
   isOpen: boolean;
   project: Projet | null;
   tasks: Tache[];
+  milestones?: Milestone[];
+  phases?: ProjectPhase[];
   onClose: () => void;
   onUpdateProject: (
     id: string, 
@@ -35,9 +43,14 @@ interface ProjectDetailViewProps {
     hasCapacityPlanning?: boolean,
     requiresTimesheet?: boolean
   ) => void;
+  onSaveMilestone: (milestone: Milestone) => void;
+  onDeleteMilestone: (milestoneId: string) => void;
+  onSavePhase: (phase: ProjectPhase) => void;
+  onDeletePhase: (phaseId: string) => void;
+  onUpdateTask?: (task: Tache) => void;
 }
 
-type TabType = 'overview' | 'deliverables' | 'capacity' | 'raid';
+type TabType = 'overview' | 'deliverables' | 'capacity' | 'raid' | 'roadmap';
 
 const STATUS_LABELS: Record<string, string> = {
   Backlog: 'Backlog',
@@ -59,16 +72,51 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
   isOpen,
   project,
   tasks,
+  milestones = [],
+  phases = [],
   onClose,
   onUpdateProject,
+  onSaveMilestone,
+  onDeleteMilestone,
+  onSavePhase,
+  onDeletePhase,
+  onUpdateTask,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const [roadmapSubTab, setRoadmapSubTab] = useState<'milestones' | 'phases' | 'tasks'>('milestones');
+
+  // Formulaire d'ajout de jalon (Milestone)
+  const [mTitle, setMTitle] = useState('');
+  const [mDate, setMDate] = useState('');
+  const [mDesc, setMDesc] = useState('');
+  const [mError, setMError] = useState('');
+
+  // Formulaire d'ajout de phase de projet
+  const [pName, setPName] = useState('');
+  const [pStart, setPStart] = useState('');
+  const [pEnd, setPEnd] = useState('');
+  const [pColor, setPColor] = useState('#D9E4DD'); // Pastel Japandi par défaut
+  const [pEpicKey, setPEpicKey] = useState('');
+  const [pEpicUrl, setPEpicUrl] = useState('');
+  const [pError, setPError] = useState('');
 
   // Filtrer les tâches liées à ce projet
   const projectTasks = useMemo(() => {
     if (!project) return [];
     return tasks.filter((t) => t.projetId === project.id);
   }, [tasks, project?.id]);
+
+  // Filtrer les jalons liés à ce projet
+  const projectMilestones = useMemo(() => {
+    if (!project) return [];
+    return milestones.filter((m) => m.projectId === project.id);
+  }, [milestones, project?.id]);
+
+  // Filtrer les phases liées à ce projet
+  const projectPhases = useMemo(() => {
+    if (!project) return [];
+    return phases.filter((p) => p.projectId === project.id);
+  }, [phases, project?.id]);
 
   // Statistiques des tâches
   const taskStats = useMemo(() => {
@@ -265,6 +313,24 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
             {project.raidLog && project.raidLog.filter(item => item.status === 'open').length > 0 && (
               <span className="inline-flex h-4.5 min-w-4.5 px-1 items-center justify-center rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-[9px] font-bold">
                 {project.raidLog.filter(item => item.status === 'open').length}
+              </span>
+            )}
+          </button>
+
+          <button
+            id="tab-btn-roadmap"
+            type="button"
+            onClick={() => setActiveTab('roadmap')}
+            className={`ml-8 pb-3 px-2 text-xs font-bold border-b-2 transition-all relative flex items-center gap-1.5 ${
+              activeTab === 'roadmap'
+                ? 'border-[#6B8E78] text-[#5D7C68]'
+                : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
+            }`}
+          >
+            <span>🗺️ Roadmap</span>
+            {projectMilestones.length > 0 && (
+              <span className="inline-flex h-4.5 min-w-4.5 px-1 items-center justify-center rounded-full bg-[#6B8E78]/10 text-[#5D7C68] border border-[#6B8E78]/20 text-[9px] font-bold">
+                {projectMilestones.length}
               </span>
             )}
           </button>
@@ -470,6 +536,901 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
               onUpdateRaidLog={handleUpdateRaid}
             />
           )}
+
+          {activeTab === 'roadmap' && (() => {
+            const today = new Date();
+            const todayStr = today.toISOString().split('T')[0];
+            
+            // Rassemblement des dates (y compris dates de phases)
+            const dateTimes: number[] = [today.getTime()];
+            projectTasks.forEach((t) => {
+              const dStr = t.createdAt?.split('T')[0];
+              if (dStr) dateTimes.push(new Date(dStr).getTime());
+              if (t.dateEcheance) dateTimes.push(new Date(t.dateEcheance).getTime());
+            });
+            project.deliverables?.forEach((d) => {
+              if (d.targetDate) dateTimes.push(new Date(d.targetDate).getTime());
+            });
+            projectMilestones.forEach((m) => {
+              if (m.date) dateTimes.push(new Date(m.date).getTime());
+            });
+            projectPhases.forEach((p) => {
+              if (p.startDate) dateTimes.push(new Date(p.startDate).getTime());
+              if (p.endDate) dateTimes.push(new Date(p.endDate).getTime());
+            });
+
+            const minT = Math.min(...dateTimes) - 5 * 24 * 60 * 60 * 1000; // Marge 5 jours avant
+            const maxT = Math.max(...dateTimes) + 10 * 24 * 60 * 60 * 1000; // Marge 10 jours après
+            const span = maxT - minT;
+
+            const getXCoordinate = (dateStr: string) => {
+              if (!dateStr) return 180;
+              const time = new Date(dateStr).getTime();
+              if (isNaN(time)) return 180;
+              const pct = (time - minT) / span;
+              return 180 + pct * 740; // Largeur de 180px à 920px (largeur utile = 740px)
+            };
+
+            const todayX = getXCoordinate(todayStr);
+
+            // Fusionner tâches et livrables pour l'affichage chronologique
+            const timelineRows: { id: string; label: string; start: string; end: string; type: 'task' | 'deliverable'; color: string; hasAlert?: boolean; alertMsg?: string }[] = [];
+            projectTasks.slice(0, 10).forEach((t) => {
+              const start = t.createdAt?.split('T')[0] || todayStr;
+              const end = t.dateEcheance || todayStr;
+              
+              let hasAlert = false;
+              let alertMsg = "";
+              if (t.phaseId) {
+                const ph = projectPhases.find((p) => p.id === t.phaseId);
+                if (ph) {
+                  if (t.dateEcheance) {
+                    if (t.dateEcheance < ph.startDate || t.dateEcheance > ph.endDate) {
+                      hasAlert = true;
+                      alertMsg = `Tâche hors phase « ${ph.name} »: Échéance ${t.dateEcheance} est hors limites [${ph.startDate} au ${ph.endDate}]`;
+                    }
+                  }
+                }
+              }
+
+              timelineRows.push({
+                id: t.id,
+                label: t.titre,
+                start,
+                end,
+                type: 'task',
+                color: t.statut === 'Done' ? '#6B8E78' : t.statut === 'Blocked' ? '#F43F5E' : '#C89B7B',
+                hasAlert,
+                alertMsg,
+              });
+            });
+
+            (project.deliverables || []).slice(0, 5).forEach((d) => {
+              const date = d.targetDate || todayStr;
+              timelineRows.push({
+                id: d.id,
+                label: `[Livrable] ${d.title}`,
+                start: date,
+                end: date,
+                type: 'deliverable',
+                color: d.status === 'delivered' ? '#10B981' : '#6366F1',
+              });
+            });
+
+            const rowHeight = 32;
+            const headerHeight = 65; // marge un peu plus grande pour les titres de phases
+            const calculatedSvgHeight = headerHeight + (timelineRows.length * rowHeight) + 40;
+
+            const handleAddMilestoneSubmit = (e: React.FormEvent) => {
+              e.preventDefault();
+              setMError('');
+              if (!mTitle.trim()) {
+                setMError('Le titre du jalon est requis.');
+                return;
+              }
+              if (!mDate) {
+                setMError('La date du jalon est requise.');
+                return;
+              }
+
+              onSaveMilestone({
+                id: `milestone-${Date.now()}`,
+                spaceId: project.spaceId,
+                projectId: project.id,
+                title: mTitle.trim(),
+                date: mDate,
+                description: mDesc.trim() || undefined,
+                completed: false,
+              });
+
+              setMTitle('');
+              setMDate('');
+              setMDesc('');
+            };
+
+            const toggleMilestoneCompletion = (m: Milestone) => {
+              onSaveMilestone({
+                ...m,
+                completed: !m.completed,
+              });
+            };
+
+            return (
+              <div className="space-y-6">
+                {/* 1. CHRONOGRAMME SVG AVEC JALONS OVERLAY */}
+                <div className="rounded-2xl border border-[#F0EFEB] bg-white p-5 shadow-xs space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-[#F0EFEB]">
+                    <div className="flex items-center gap-2">
+                      <Map className="h-4 w-4 text-[#6B8E78]" />
+                      <h4 className="text-xs font-bold text-[#1A1D1A]">Roadmap & Chronogramme SVG</h4>
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px] text-[#737873]">
+                      <div className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded bg-blue-500" />
+                        <span>Aujourd&apos;hui</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded bg-[#C89B7B]" />
+                        <span>En cours</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded bg-[#6B8E78]" />
+                        <span>Terminé / Jalon acquis</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Zone de l'image SVG interactive */}
+                  <div className="overflow-x-auto custom-scrollbar">
+                    <svg
+                      viewBox={`0 0 950 ${calculatedSvgHeight}`}
+                      className="w-full min-w-[850px] h-auto overflow-visible select-none font-sans"
+                    >
+                      {/* Lignes de repères de temps vertical */}
+                      <line x1={180} y1={headerHeight} x2={180} y2={calculatedSvgHeight - 20} stroke="#F0EFEB" />
+                      <line x1={920} y1={headerHeight} x2={920} y2={calculatedSvgHeight - 20} stroke="#F0EFEB" />
+
+                      {/* Bandes / Conteneurs visuels des Phases de Projet (Japandi) */}
+                      {projectPhases.map((phase) => {
+                        const pxStart = getXCoordinate(phase.startDate);
+                        const pxEnd = getXCoordinate(phase.endDate);
+                        const width = pxEnd - pxStart;
+                        if (width <= 0) return null;
+                        
+                        const phaseColor = phase.color || '#D9E4DD';
+                        return (
+                          <g key={phase.id}>
+                            <rect
+                              x={pxStart}
+                              y={headerHeight - 25}
+                              width={width}
+                              height={calculatedSvgHeight - headerHeight + 5}
+                              fill={phaseColor}
+                              fillOpacity={0.15}
+                              stroke={phaseColor}
+                              strokeWidth={1}
+                              strokeDasharray="4 4"
+                              rx={4}
+                            />
+                            {/* Onglet titre au sommet du container */}
+                            <g transform={`translate(${pxStart + 4}, ${headerHeight - 20})`}>
+                              <rect
+                                x={0}
+                                y={-10}
+                                width={Math.min(width - 8, 170)}
+                                height={14}
+                                rx={3}
+                                fill={phaseColor}
+                              />
+                              <text
+                                x={4}
+                                y={0}
+                                fontSize="8"
+                                fontWeight="bold"
+                                fill="#1A1D1A"
+                                className="truncate font-sans uppercase tracking-wider"
+                              >
+                                {phase.name.length > 22 ? `${phase.name.substring(0, 20)}...` : phase.name}
+                              </text>
+                            </g>
+
+                            {/* JIRA Epic Key hyperlink */}
+                            {phase.jiraEpicKey && (
+                              <g transform={`translate(${pxStart + 6}, ${headerHeight - 4})`}>
+                                <text
+                                  x={0}
+                                  y={0}
+                                  fontSize="7.5"
+                                  fontWeight="600"
+                                  fill="#4F46E5"
+                                  className="cursor-pointer underline font-mono"
+                                  onClick={() => {
+                                    if (phase.jiraEpicUrl) {
+                                      window.open(phase.jiraEpicUrl, '_blank');
+                                    } else {
+                                      window.open(`https://jira.company.com/browse/${phase.jiraEpicKey}`, '_blank');
+                                    }
+                                  }}
+                                >
+                                  ⚡ {phase.jiraEpicKey}
+                                </text>
+                              </g>
+                            )}
+                          </g>
+                        );
+                      })}
+
+                      {/* Repère Aujourd'hui */}
+                      {todayX >= 180 && todayX <= 920 && (
+                        <g>
+                          <line
+                            x1={todayX}
+                            y1={headerHeight - 25}
+                            x2={todayX}
+                            y2={calculatedSvgHeight - 25}
+                            stroke="#3B82F6"
+                            strokeWidth={1.5}
+                            strokeDasharray="2 2"
+                          />
+                          <rect
+                            x={todayX - 35}
+                            y={15}
+                            width={70}
+                            height={16}
+                            rx={4}
+                            fill="#3B82F6"
+                          />
+                          <text
+                            x={todayX}
+                            y={26}
+                            fill="white"
+                            fontSize="8"
+                            fontWeight="bold"
+                            textAnchor="middle"
+                          >
+                            AUJOURD&apos;HUI
+                          </text>
+                        </g>
+                      )}
+
+                      {/* Repères verticaux de Jalons (Milestones) */}
+                      {projectMilestones.map((m) => {
+                        const mx = getXCoordinate(m.date);
+                        if (mx < 180 || mx > 920) return null;
+                        const milestoneColor = m.completed ? '#6B8E78' : '#C89B7B';
+                        return (
+                          <g key={m.id}>
+                            <line
+                              x1={mx}
+                              y1={headerHeight}
+                              x2={mx}
+                              y2={calculatedSvgHeight - 25}
+                              stroke={milestoneColor}
+                              strokeWidth={1.2}
+                              strokeDasharray="4 4"
+                            />
+                            {/* Losange au sommet */}
+                            <path
+                              d={`M ${mx} ${headerHeight - 2} L ${mx + 6} ${headerHeight + 4} L ${mx} ${headerHeight + 10} L ${mx - 6} ${headerHeight + 4} Z`}
+                              fill={milestoneColor}
+                              stroke="white"
+                              strokeWidth={1.5}
+                            />
+                            {/* Titre du jalon au sommet */}
+                            <text
+                              x={mx}
+                              y={headerHeight - 8}
+                              fill={milestoneColor}
+                              fontSize="8"
+                              fontWeight="bold"
+                              textAnchor="middle"
+                              className="uppercase tracking-wider"
+                            >
+                              🚩 {m.title}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Graduation temporelle en haut */}
+                      <text x={185} y={headerHeight - 35} fontSize="9" fontWeight="bold" fill="#737873" textAnchor="start">
+                        Début du suivi
+                      </text>
+                      <text x={915} y={headerHeight - 35} fontSize="9" fontWeight="bold" fill="#737873" textAnchor="end">
+                        Fin de période
+                      </text>
+
+                      {/* Liste des éléments du chronogramme */}
+                      {timelineRows.map((row, idx) => {
+                        const y = headerHeight + 20 + (idx * rowHeight);
+                        const sx = getXCoordinate(row.start);
+                        const ex = Math.max(sx + 8, getXCoordinate(row.end)); // au moins 8px de large
+
+                        return (
+                          <g key={row.id}>
+                            {/* Label à gauche */}
+                            <text
+                              x={10}
+                              y={y + 12}
+                              fontSize="10"
+                              fontWeight="500"
+                              fill="#1A1D1A"
+                              textAnchor="start"
+                              className="truncate"
+                            >
+                              {row.label.length > 22 ? `${row.label.substring(0, 20)}...` : row.label}
+                            </text>
+
+                            {/* Alerte si tâche dépasse sa phase */}
+                            {row.hasAlert && (
+                              <g transform={`translate(${165}, ${y + 2})`} className="cursor-pointer">
+                                <title>{row.alertMsg}</title>
+                                <path d="M 0,-4 L 4,4 L -4,4 Z" fill="#EF4444" stroke="#B91C1C" strokeWidth={0.8} />
+                                <text x={0} y={3.5} fontSize="6" fontWeight="bold" fill="white" textAnchor="middle">!</text>
+                              </g>
+                            )}
+
+                            {/* Ligne pointillée de fond pour la ligne */}
+                            <line
+                              x1={180}
+                              y1={y + 8}
+                              x2={920}
+                              y2={y + 8}
+                              stroke="#F0EFEB"
+                              strokeWidth={0.5}
+                              strokeDasharray="2 2"
+                            />
+
+                            {/* Barre de chronogramme */}
+                            {row.type === 'task' ? (
+                              <rect
+                                x={sx}
+                                y={y}
+                                width={Math.max(8, ex - sx)}
+                                height={15}
+                                rx={4}
+                                fill={`${row.color}30`}
+                                stroke={row.color}
+                                strokeWidth={1}
+                              />
+                            ) : (
+                              // Livrable sous forme de cercle distinct
+                              <circle
+                                cx={sx}
+                                cy={y + 7}
+                                r={6}
+                                fill={row.color}
+                                stroke="white"
+                                strokeWidth={1}
+                              />
+                            )}
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+
+                  {timelineRows.length === 0 && (
+                    <p className="text-center py-6 text-xs text-[#737873] font-light">
+                      Aucune tâche ni livrable disponible pour tracer le chronogramme.
+                    </p>
+                  )}
+                </div>
+
+                {/* 2. BARRE DES SOUS-ONGLETS CONFIGURATION DE LA ROADMAP */}
+                <div className="flex border-b border-[#F0EFEB] pb-1 gap-5">
+                  <button
+                    type="button"
+                    onClick={() => setRoadmapSubTab('milestones')}
+                    className={`pb-2 text-xs font-bold border-b-2 transition-all relative flex items-center gap-1.5 ${
+                      roadmapSubTab === 'milestones'
+                        ? 'border-[#6B8E78] text-[#5D7C68]'
+                        : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
+                    }`}
+                  >
+                    <span>🚩 Jalons Macro ({projectMilestones.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRoadmapSubTab('phases')}
+                    className={`pb-2 text-xs font-bold border-b-2 transition-all relative flex items-center gap-1.5 ${
+                      roadmapSubTab === 'phases'
+                        ? 'border-[#6B8E78] text-[#5D7C68]'
+                        : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
+                    }`}
+                  >
+                    <span>📦 Phases & Épics JIRA ({projectPhases.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRoadmapSubTab('tasks')}
+                    className={`pb-2 text-xs font-bold border-b-2 transition-all relative flex items-center gap-1.5 ${
+                      roadmapSubTab === 'tasks'
+                        ? 'border-[#6B8E78] text-[#5D7C68]'
+                        : 'border-transparent text-[#737873] hover:text-[#1A1D1A]'
+                    }`}
+                  >
+                    <span>📋 Assignation des Tâches ({projectTasks.length})</span>
+                  </button>
+                </div>
+
+                {/* RENDU DES SOUS-ONGLETS */}
+                {roadmapSubTab === 'milestones' && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-150">
+                    {/* Liste des Jalons */}
+                    <div className="md:col-span-2 bg-white rounded-2xl border border-[#F0EFEB] p-5 shadow-xs space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-[#F0EFEB]">
+                        <Flag className="h-4 w-4 text-[#6B8E78]" />
+                        <h4 className="text-xs font-bold text-[#1A1D1A]">Liste des Jalons du Projet</h4>
+                      </div>
+
+                      {projectMilestones.length === 0 ? (
+                        <div className="text-center py-12 text-[#737873] border border-dashed border-[#F0EFEB] rounded-xl bg-[#FAF9F6]">
+                          <Flag className="h-6 w-6 mx-auto mb-2 text-[#737873]/50" />
+                          <p className="text-xs font-medium text-[#1A1D1A]">Aucun jalon défini</p>
+                          <p className="text-[10px] text-[#737873] font-light mt-0.5 max-w-xs mx-auto">
+                            Ajoutez un jalon à droite pour fixer des repères clés de votre projet.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3.5 max-h-96 overflow-y-auto pr-1">
+                          {projectMilestones.map((m) => (
+                            <div
+                              key={m.id}
+                              className="rounded-xl border border-[#F0EFEB] bg-[#FAF9F6]/50 p-4 flex items-start justify-between gap-4 hover:border-[#E2DFD8] transition-colors"
+                            >
+                              <div className="flex items-start gap-3 min-w-0">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleMilestoneCompletion(m)}
+                                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all ${
+                                    m.completed
+                                      ? 'bg-[#6B8E78] border-[#6B8E78] text-white'
+                                      : 'border-[#EAE8E2] bg-white hover:border-[#6B8E78]'
+                                  }`}
+                                >
+                                  {m.completed && <Check className="h-3 w-3 stroke-[3]" />}
+                                </button>
+
+                                <div className="min-w-0 space-y-1">
+                                  <h5 className={`text-xs font-bold text-[#1A1D1A] ${m.completed ? 'line-through text-[#737873]' : ''}`}>
+                                    {m.title}
+                                  </h5>
+                                  {m.description && (
+                                    <p className="text-[11px] text-[#737873] font-light leading-relaxed">
+                                      {m.description}
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-1.5 text-[10px] text-[#737873] font-medium pt-0.5">
+                                    <Calendar className="h-3.5 w-3.5 text-[#737873]" />
+                                    <span>{new Date(m.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => onDeleteMilestone(m.id)}
+                                className="rounded-lg p-1.5 text-[#737873] hover:bg-rose-50 hover:text-rose-600 transition-colors shrink-0"
+                                title="Supprimer le jalon"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Formulaire d'Ajout */}
+                    <div className="bg-white rounded-2xl border border-[#F0EFEB] p-5 shadow-xs space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-[#F0EFEB]">
+                        <Plus className="h-4 w-4 text-[#6B8E78]" />
+                        <h4 className="text-xs font-bold text-[#1A1D1A]">Nouveau Jalon</h4>
+                      </div>
+
+                      <form onSubmit={handleAddMilestoneSubmit} className="space-y-4">
+                        {mError && (
+                          <div className="rounded-xl bg-rose-50 border border-rose-100 p-3 text-[11px] text-rose-600 font-medium">
+                            {mError}
+                          </div>
+                        )}
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                            Titre du Jalon *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ex: Lancement Beta, Kick-off..."
+                            value={mTitle}
+                            onChange={(e) => setMTitle(e.target.value)}
+                            className="w-full rounded-xl border border-[#F0EFEB] bg-white p-2.5 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                            Date d&apos;Échéance *
+                          </label>
+                          <input
+                            type="date"
+                            required
+                            value={mDate}
+                            onChange={(e) => setMDate(e.target.value)}
+                            className="w-full rounded-xl border border-[#F0EFEB] bg-white p-2.5 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                            Description / Objectif
+                          </label>
+                          <textarea
+                            placeholder="Ex: Atteindre 100 utilisateurs actifs..."
+                            value={mDesc}
+                            onChange={(e) => setMDesc(e.target.value)}
+                            rows={3}
+                            className="w-full rounded-xl border border-[#F0EFEB] bg-white p-2.5 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78] resize-none"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-[#6B8E78] py-2.5 text-xs font-bold text-white hover:bg-[#5D7C68] transition-colors"
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span>Ajouter le Jalon</span>
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
+                {roadmapSubTab === 'phases' && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-150">
+                    {/* Liste des Phases */}
+                    <div className="md:col-span-2 bg-white rounded-2xl border border-[#F0EFEB] p-5 shadow-xs space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-[#F0EFEB]">
+                        <Layers className="h-4 w-4 text-[#6B8E78]" />
+                        <h4 className="text-xs font-bold text-[#1A1D1A]">Phases Planifiées du Projet</h4>
+                      </div>
+
+                      {projectPhases.length === 0 ? (
+                        <div className="text-center py-12 text-[#737873] border border-dashed border-[#F0EFEB] rounded-xl bg-[#FAF9F6]">
+                          <Layers className="h-6 w-6 mx-auto mb-2 text-[#737873]/50" />
+                          <p className="text-xs font-medium text-[#1A1D1A]">Aucune phase définie</p>
+                          <p className="text-[10px] text-[#737873] font-light mt-0.5 max-w-xs mx-auto">
+                            Ajoutez une phase de projet à droite pour structurer votre planning en conteneurs temporels.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3.5 max-h-96 overflow-y-auto pr-1">
+                          {projectPhases.map((p) => (
+                            <div
+                              key={p.id}
+                              className="rounded-xl border border-[#F0EFEB] bg-[#FAF9F6]/50 p-4 flex items-start justify-between gap-4 hover:border-[#E2DFD8] transition-colors"
+                            >
+                              <div className="flex items-start gap-3 min-w-0">
+                                <span
+                                  className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0 mt-1"
+                                  style={{ backgroundColor: p.color || '#D9E4DD' }}
+                                />
+                                <div className="min-w-0 space-y-1">
+                                  <h5 className="text-xs font-bold text-[#1A1D1A]">
+                                    {p.name}
+                                  </h5>
+                                  <div className="flex items-center gap-4 text-[10px] text-[#737873] font-medium">
+                                    <div className="flex items-center gap-1">
+                                      <Calendar className="h-3.5 w-3.5" />
+                                      <span>Du {new Date(p.startDate).toLocaleDateString('fr-FR')} au {new Date(p.endDate).toLocaleDateString('fr-FR')}</span>
+                                    </div>
+                                    {p.jiraEpicKey && (
+                                      <span
+                                        className="font-mono text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded cursor-pointer hover:bg-indigo-100"
+                                        onClick={() => {
+                                          if (p.jiraEpicUrl) {
+                                            window.open(p.jiraEpicUrl, '_blank');
+                                          } else {
+                                            window.open(`https://jira.company.com/browse/${p.jiraEpicKey}`, '_blank');
+                                          }
+                                        }}
+                                      >
+                                        ⚡ Epic JIRA : {p.jiraEpicKey}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => onDeletePhase(p.id)}
+                                className="rounded-lg p-1.5 text-[#737873] hover:bg-rose-50 hover:text-rose-600 transition-colors shrink-0"
+                                title="Supprimer la phase"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Formulaire de création de phase */}
+                    <div className="bg-white rounded-2xl border border-[#F0EFEB] p-5 shadow-xs space-y-4">
+                      <div className="flex items-center gap-2 pb-2 border-b border-[#F0EFEB]">
+                        <Plus className="h-4 w-4 text-[#6B8E78]" />
+                        <h4 className="text-xs font-bold text-[#1A1D1A]">Nouvelle Phase</h4>
+                      </div>
+
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          setPError('');
+                          if (!pName.trim()) {
+                            setPError('Le nom de la phase est requis.');
+                            return;
+                          }
+                          if (!pStart || !pEnd) {
+                            setPError('Les dates de début et de fin sont requises.');
+                            return;
+                          }
+                          if (pStart > pEnd) {
+                            setPError('La date de début doit précéder ou égaler la date de fin.');
+                            return;
+                          }
+
+                          onSavePhase({
+                            id: `phase-${Date.now()}`,
+                            spaceId: project.spaceId,
+                            projectId: project.id,
+                            name: pName.trim(),
+                            startDate: pStart,
+                            endDate: pEnd,
+                            color: pColor,
+                            jiraEpicKey: pEpicKey.trim() || undefined,
+                            jiraEpicUrl: pEpicUrl.trim() || undefined,
+                          });
+
+                          setPName('');
+                          setPStart('');
+                          setPEnd('');
+                          setPColor('#D9E4DD');
+                          setPEpicKey('');
+                          setPEpicUrl('');
+                        }}
+                        className="space-y-4"
+                      >
+                        {pError && (
+                          <div className="rounded-xl bg-rose-50 border border-rose-100 p-3 text-[11px] text-rose-600 font-medium">
+                            {pError}
+                          </div>
+                        )}
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                            Nom de la Phase *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ex: Cadrage & Architecture"
+                            value={pName}
+                            onChange={(e) => setPName(e.target.value)}
+                            className="w-full rounded-xl border border-[#F0EFEB] bg-white p-2.5 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                              Date Début *
+                            </label>
+                            <input
+                              type="date"
+                              required
+                              value={pStart}
+                              onChange={(e) => setPStart(e.target.value)}
+                              className="w-full rounded-xl border border-[#F0EFEB] bg-white p-2.5 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                              Date Fin *
+                            </label>
+                            <input
+                              type="date"
+                              required
+                              value={pEnd}
+                              onChange={(e) => setPEnd(e.target.value)}
+                              className="w-full rounded-xl border border-[#F0EFEB] bg-white p-2.5 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Choix de la couleur pastel Japandi */}
+                        <div className="space-y-1.5">
+                          <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873] block">
+                            Nuance Japandi
+                          </label>
+                          <div className="flex items-center gap-2">
+                            {[
+                              { label: 'Sauge', hex: '#D9E4DD' },
+                              { label: 'Sable', hex: '#EAE2D8' },
+                              { label: 'Argile', hex: '#F1E3D3' },
+                              { label: 'Lin', hex: '#E3D5CA' },
+                              { label: 'Ciel', hex: '#D0E1FD' },
+                            ].map((col) => (
+                              <button
+                                key={col.hex}
+                                type="button"
+                                onClick={() => setPColor(col.hex)}
+                                className={`h-6 w-6 rounded-full border flex items-center justify-center transition-all ${
+                                  pColor === col.hex
+                                    ? 'border-[#1A1D1A] scale-110 shadow-xs'
+                                    : 'border-transparent hover:scale-105'
+                                }`}
+                                style={{ backgroundColor: col.hex }}
+                                title={col.label}
+                              >
+                                {pColor === col.hex && <Check className="h-3 w-3 text-black" />}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="border-t border-[#F0EFEB] pt-3 space-y-3">
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873] flex items-center justify-between">
+                              <span>Clé d&apos;Épic JIRA (Optionnel)</span>
+                              <span className="font-mono text-[9px] text-[#737873]">Ex: PMO-102</span>
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="PMO-102"
+                              value={pEpicKey}
+                              onChange={(e) => setPEpicKey(e.target.value)}
+                              className="w-full rounded-xl border border-[#F0EFEB] bg-white p-2.5 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                            />
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                              URL de l&apos;Épic JIRA (Optionnel)
+                            </label>
+                            <input
+                              type="url"
+                              placeholder="https://jira.company.com/browse/PMO-102"
+                              value={pEpicUrl}
+                              onChange={(e) => setPEpicUrl(e.target.value)}
+                              className="w-full rounded-xl border border-[#F0EFEB] bg-white p-2.5 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full flex items-center justify-center gap-1.5 rounded-xl bg-[#6B8E78] py-2.5 text-xs font-bold text-white hover:bg-[#5D7C68] transition-colors"
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span>Ajouter la Phase</span>
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                )}
+
+                {roadmapSubTab === 'tasks' && (
+                  <div className="bg-white rounded-2xl border border-[#F0EFEB] p-5 shadow-xs space-y-4 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#F0EFEB]">
+                      <div className="flex items-center gap-2">
+                        <CheckSquare className="h-4 w-4 text-[#6B8E78]" />
+                        <h4 className="text-xs font-bold text-[#1A1D1A]">Alignement des Tâches aux Phases & Alertes Temporelles</h4>
+                      </div>
+                      <span className="text-[10px] font-medium text-[#737873] bg-[#FAF9F6] px-2 py-0.5 rounded border border-[#F0EFEB]">
+                        Gérez le cloisonnement temporel de vos livrables
+                      </span>
+                    </div>
+
+                    {projectTasks.length === 0 ? (
+                      <div className="text-center py-12 text-[#737873] border border-dashed border-[#F0EFEB] rounded-xl bg-[#FAF9F6]">
+                        <CheckSquare className="h-6 w-6 mx-auto mb-2 text-[#737873]/50" />
+                        <p className="text-xs font-medium text-[#1A1D1A]">Aucune tâche associée au projet</p>
+                        <p className="text-[10px] text-[#737873] font-light mt-0.5">
+                          Créez des tâches et associez-les à ce projet pour les aligner aux phases de planification.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {projectTasks.map((t) => {
+                          const associatedPhase = t.phaseId ? projectPhases.find((p) => p.id === t.phaseId) : null;
+                          
+                          // Alerte de débordement
+                          let exceedsPhase = false;
+                          let alertDetails = '';
+                          if (associatedPhase && t.dateEcheance) {
+                            if (t.dateEcheance < associatedPhase.startDate || t.dateEcheance > associatedPhase.endDate) {
+                              exceedsPhase = true;
+                              alertDetails = `L'échéance de la tâche (${t.dateEcheance}) déborde de sa phase « ${associatedPhase.name} » [${associatedPhase.startDate} au ${associatedPhase.endDate}]`;
+                            }
+                          }
+
+                          return (
+                            <div
+                              key={t.id}
+                              className={`rounded-xl border p-4 transition-all space-y-2 flex flex-col ${
+                                exceedsPhase
+                                  ? 'border-rose-200 bg-rose-50/20'
+                                  : 'border-[#F0EFEB] bg-white hover:border-[#E2DFD8]'
+                              }`}
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="min-w-0 space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h5 className="text-xs font-bold text-[#1A1D1A] truncate">
+                                      {t.titre}
+                                    </h5>
+                                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                                      t.statut === 'Done'
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : t.statut === 'Blocked'
+                                        ? 'bg-rose-50 text-rose-700'
+                                        : 'bg-amber-50 text-amber-700'
+                                    }`}>
+                                      {t.statut}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-[10px] text-[#737873]">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    <span>Échéance : {t.dateEcheance ? new Date(t.dateEcheance).toLocaleDateString('fr-FR') : 'Non définie'}</span>
+                                  </div>
+                                </div>
+
+                                {/* Sélecteur de phase */}
+                                <div className="flex items-center gap-1.5 self-start sm:self-auto shrink-0">
+                                  <span className="text-[10px] font-bold text-[#737873]">Phase :</span>
+                                  <select
+                                    value={t.phaseId || ''}
+                                    onChange={(e) => {
+                                      if (onUpdateTask) {
+                                        onUpdateTask({
+                                          ...t,
+                                          phaseId: e.target.value || null,
+                                        });
+                                      }
+                                    }}
+                                    className="rounded-lg border border-[#F0EFEB] bg-white px-2 py-1 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78] min-w-[150px]"
+                                  >
+                                    <option value="">-- Sans Phase --</option>
+                                    {projectPhases.map((phase) => (
+                                      <option key={phase.id} value={phase.id}>
+                                        {phase.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+
+                              {/* Alerte explicite si débordement */}
+                              {exceedsPhase && (
+                                <div className="rounded-lg bg-rose-50 border border-rose-100 px-3 py-2 flex items-center gap-2 text-[10px] text-rose-700 font-medium">
+                                  <AlertCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
+                                  <span>{alertDetails}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
 

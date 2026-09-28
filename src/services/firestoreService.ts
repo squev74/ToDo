@@ -23,6 +23,8 @@ import {
   UserProfile,
   UserRole,
   UserStatus,
+  Milestone,
+  ProjectPhase,
   ADMIN_EMAIL,
   ADMIN_UID,
 } from '../types';
@@ -165,6 +167,8 @@ export function sanitizeTaskForFirestore(task: Tache, userId: string): Record<st
     titre: task.titre || '',
     description: task.description || '',
     projetId: task.projetId ?? null,
+    phaseId: task.phaseId ?? null,
+    jiraKey: task.jiraKey || null,
     statut: task.statut,
     dateEcheance: task.dateEcheance ?? null,
     dateRealisation: task.dateRealisation ?? null,
@@ -188,13 +192,15 @@ export function sanitizeTaskForFirestore(task: Tache, userId: string): Record<st
 }
 
 /**
- * Écoute en temps réel les espaces, projets et tâches d'un utilisateur spécifique (isolation stricte).
+ * Écoute en temps réel les espaces, projets, tâches, jalons et phases d'un utilisateur spécifique (isolation stricte).
  */
 export function subscribeToUserData(
   userId: string,
   onTasksChange: (tasks: Tache[]) => void,
   onProjectsChange: (projects: Projet[]) => void,
   onSpacesChange?: (spaces: Espace[]) => void,
+  onMilestonesChange?: (milestones: Milestone[]) => void,
+  onPhasesChange?: (phases: ProjectPhase[]) => void,
   onError?: (error: Error) => void
 ): () => void {
   if (!userId) {
@@ -204,6 +210,8 @@ export function subscribeToUserData(
   const spacesColl = collection(db, 'users', userId, 'spaces');
   const projectsColl = collection(db, 'users', userId, 'projects');
   const tasksColl = collection(db, 'users', userId, 'tasks');
+  const milestonesColl = collection(db, 'users', userId, 'milestones');
+  const phasesColl = collection(db, 'users', userId, 'phases');
 
   const unsubscribeSpaces = onSnapshot(
     spacesColl,
@@ -277,10 +285,56 @@ export function subscribeToUserData(
     }
   );
 
+  const unsubscribeMilestones = onSnapshot(
+    milestonesColl,
+    (snapshot) => {
+      const milestones: Milestone[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as Milestone;
+        milestones.push({
+          ...data,
+          spaceId: data.spaceId || DEFAULT_SPACE_ID,
+        });
+      });
+      // Tri par date croissante
+      milestones.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      if (onMilestonesChange) {
+        onMilestonesChange(milestones);
+      }
+    },
+    (err) => {
+      console.warn('Erreur synchronisation Firestore Jalons:', err.message);
+    }
+  );
+
+  const unsubscribePhases = onSnapshot(
+    phasesColl,
+    (snapshot) => {
+      const phases: ProjectPhase[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as ProjectPhase;
+        phases.push({
+          ...data,
+          spaceId: data.spaceId || DEFAULT_SPACE_ID,
+        });
+      });
+      // Tri par date de début croissante
+      phases.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+      if (onPhasesChange) {
+        onPhasesChange(phases);
+      }
+    },
+    (err) => {
+      console.warn('Erreur synchronisation Firestore Phases:', err.message);
+    }
+  );
+
   return () => {
     unsubscribeSpaces();
     unsubscribeProjects();
     unsubscribeTasks();
+    unsubscribeMilestones();
+    unsubscribePhases();
   };
 }
 
@@ -482,6 +536,62 @@ export async function saveProjectToFirestore(userId: string, project: Projet): P
     await setDoc(projRef, projectToSave, { merge: true });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+/**
+ * Enregistre ou met à jour un jalon (Milestone) dans Firestore.
+ */
+export async function saveMilestoneToFirestore(userId: string, milestone: Milestone): Promise<void> {
+  if (!userId) return;
+  const path = `users/${userId}/milestones/${milestone.id}`;
+  try {
+    const mRef = doc(db, 'users', userId, 'milestones', milestone.id);
+    await setDoc(mRef, cleanForFirestore(milestone), { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+/**
+ * Enregistre ou met à jour une phase de projet (ProjectPhase) dans Firestore.
+ */
+export async function savePhaseToFirestore(userId: string, phase: ProjectPhase): Promise<void> {
+  if (!userId) return;
+  const path = `users/${userId}/phases/${phase.id}`;
+  try {
+    const pRef = doc(db, 'users', userId, 'phases', phase.id);
+    await setDoc(pRef, cleanForFirestore(phase), { merge: true });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+/**
+ * Supprime une phase de projet de Firestore.
+ */
+export async function deletePhaseFromFirestore(userId: string, phaseId: string): Promise<void> {
+  if (!userId) return;
+  const path = `users/${userId}/phases/${phaseId}`;
+  try {
+    const pRef = doc(db, 'users', userId, 'phases', phaseId);
+    await deleteDoc(pRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+/**
+ * Supprime un jalon de Firestore.
+ */
+export async function deleteMilestoneFromFirestore(userId: string, milestoneId: string): Promise<void> {
+  if (!userId) return;
+  const path = `users/${userId}/milestones/${milestoneId}`;
+  try {
+    const mRef = doc(db, 'users', userId, 'milestones', milestoneId);
+    await deleteDoc(mRef);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }
 

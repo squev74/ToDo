@@ -40,6 +40,7 @@ export interface Tache {
   titre: string;
   description: string;
   projetId: string | null;
+  phaseId?: string | null; // Phase de projet associée (Optionnelle)
   jiraKey?: string; // Clé JIRA associée (ex: 'EVOLIT-24')
   statut: StatutTache;
   dateEcheance?: string | null; // Format YYYY-MM-DD
@@ -52,6 +53,18 @@ export interface Tache {
   ordre: number; // Nombre entier pour le tri
   commentaires: Commentaire[];
   activationDate?: string; // Date d'activation planifiée (format YYYY-MM-DD), applicable uniquement au statut 'Backlog'
+}
+
+export interface ProjectPhase {
+  id: string;
+  spaceId: string;
+  projectId: string;
+  name: string;             // Ex: "Phase 1 - Cadrage & Architecture"
+  startDate: string;        // YYYY-MM-DD
+  endDate: string;          // YYYY-MM-DD
+  color?: string;           // Couleur pastel (Japandi)
+  jiraEpicKey?: string;     // Ex: "PMO-102" (Optionnel)
+  jiraEpicUrl?: string;     // Ex: "https://jira.company.com/browse/PMO-102"
 }
 
 import { ProjectDeliverable, Project, TeamMember, MonthlyAllocation } from './types/project';
@@ -90,4 +103,27 @@ export * from './types/recurringTask';
 export * from './types/capacity';
 import { TimeEntry, TimesheetConfig } from './types/timesheet';
 export type { TimeEntry, TimesheetConfig };
+
+export interface ActivityLog {
+  id: string;
+  spaceId: string;
+  taskId: string;
+  taskTitle: string;
+  projectId?: string | null;
+  projectName?: string | null;
+  type: 'CREATED' | 'STATUS_CHANGED' | 'COMMENT_ADDED' | 'UPDATED';
+  details: string; // Ex: "Statut modifié : En cours ➔ Bloqué"
+  timestamp: string; // ISO string
+}
+
+export interface Milestone {
+  id: string;
+  spaceId: string;
+  projectId: string;
+  title: string;
+  date: string; // ISO String (YYYY-MM-DD)
+  description?: string;
+  completed?: boolean;
+}
+
 
