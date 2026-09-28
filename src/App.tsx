@@ -1182,6 +1182,7 @@ export default function App() {
 
   // Création / Modification d'une tâche dans l'espace actif
   const handleSaveTask = (taskData: {
+    id?: string;
     titre: string;
     description: string;
     projetId: string | null;
@@ -1192,8 +1193,12 @@ export default function App() {
     blockedReason?: string;
     activationDate?: string | null;
   }) => {
-    if (editingTask) {
-      const comments = [...(editingTask.commentaires || [])];
+    const existingTaskId = taskData.id || editingTask?.id;
+    if (existingTaskId) {
+      const taskToEdit = editingTask || tasks.find((t) => t.id === existingTaskId);
+      if (!taskToEdit) return;
+
+      const comments = [...(taskToEdit.commentaires || [])];
       if (taskData.blockedReason && taskData.statut === 'Blocked') {
         comments.push({
           id: 'comm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
@@ -1202,7 +1207,7 @@ export default function App() {
         });
       }
 
-      let updatedTask = updateTaskDetails(editingTask, {
+      let updatedTask = updateTaskDetails(taskToEdit, {
         titre: taskData.titre,
         description: taskData.description || '',
         projetId: taskData.projetId ?? null,
@@ -1210,39 +1215,53 @@ export default function App() {
         dateEcheance: taskData.dateEcheance || null,
       });
 
+      // Synchroniser automatiquement la clé d'Epic JIRA si une phase est assignée
+      let finalJiraKey = taskData.jiraKey;
+      if (taskData.phaseId) {
+        const selectedPhase = phases.find((p) => p.id === taskData.phaseId);
+        if (selectedPhase?.jiraEpicKey) {
+          finalJiraKey = selectedPhase.jiraEpicKey;
+        }
+      }
+
       updatedTask = {
         ...updatedTask,
         phaseId: taskData.phaseId || null,
-        jiraKey: taskData.jiraKey,
-        userId: user?.uid || editingTask.userId,
-        spaceId: editingTask.spaceId || currentSpace.id,
+        jiraKey: finalJiraKey || taskToEdit.jiraKey,
+        userId: user?.uid || taskToEdit.userId,
+        spaceId: taskToEdit.spaceId || currentSpace.id,
         commentaires: comments,
         activationDate: taskData.activationDate || undefined,
       };
 
-      setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? updatedTask : t)));
+      setTasks((prev) => prev.map((t) => (t.id === existingTaskId ? updatedTask : t)));
 
       // Enregistrer le log de modification de la tâche
       if (user) {
         const changes: string[] = [];
-        if (editingTask.titre !== taskData.titre) {
-          changes.push(`Titre modifié de "${editingTask.titre}" à "${taskData.titre}"`);
+        if (taskToEdit.titre !== taskData.titre) {
+          changes.push(`Titre modifié de "${taskToEdit.titre}" à "${taskData.titre}"`);
         }
-        if ((editingTask.description || '') !== (taskData.description || '')) {
+        if ((taskToEdit.description || '') !== (taskData.description || '')) {
           changes.push(`Description mise à jour`);
         }
-        if (editingTask.statut !== taskData.statut) {
-          changes.push(`Statut modifié de "${editingTask.statut}" à "${taskData.statut}"`);
+        if (taskToEdit.statut !== taskData.statut) {
+          changes.push(`Statut modifié de "${taskToEdit.statut}" à "${taskData.statut}"`);
         }
-        if (editingTask.dateEcheance !== taskData.dateEcheance) {
-          const oldDate = editingTask.dateEcheance || 'Aucune';
+        if (taskToEdit.dateEcheance !== taskData.dateEcheance) {
+          const oldDate = taskToEdit.dateEcheance || 'Aucune';
           const newDate = taskData.dateEcheance || 'Aucune';
           changes.push(`Date d'échéance modifiée de "${oldDate}" à "${newDate}"`);
         }
-        if (editingTask.projetId !== taskData.projetId) {
-          const oldProj = projects.find(p => p.id === editingTask.projetId)?.nom || 'Aucun';
+        if (taskToEdit.projetId !== taskData.projetId) {
+          const oldProj = projects.find(p => p.id === taskToEdit.projetId)?.nom || 'Aucun';
           const newProj = projects.find(p => p.id === taskData.projetId)?.nom || 'Aucun';
           changes.push(`Projet réassigné de "${oldProj}" à "${newProj}"`);
+        }
+        if (taskToEdit.phaseId !== taskData.phaseId) {
+          const oldPhase = phases.find(p => p.id === taskToEdit.phaseId)?.name || 'Aucune';
+          const newPhase = phases.find(p => p.id === taskData.phaseId)?.name || 'Aucune';
+          changes.push(`Phase modifiée de "${oldPhase}" à "${newPhase}"`);
         }
 
         const detailsText = changes.length > 0 ? changes.join(', ') : "Détails de la tâche mis à jour";
