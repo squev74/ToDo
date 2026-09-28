@@ -16,6 +16,7 @@ import {
 import { Tache, Projet } from '../types';
 import { buildCopilotContext } from '../utils/aiCopilotContext';
 import { getGeminiApiKey } from '../services/geminiReportService';
+import { compressAndLightenJson } from '../utils/aiCostOptimizer';
 
 interface Message {
   id: string;
@@ -79,6 +80,22 @@ export const PmoCopilotWidget: React.FC<PmoCopilotWidgetProps> = ({
     }
   }, [messages, isLoading]);
 
+  // Écouter le déclencheur global pour PMO CoPilot depuis la palette de commandes
+  useEffect(() => {
+    const handleTrigger = (e: Event) => {
+      const customEvent = e as CustomEvent<{ query: string }>;
+      const query = customEvent.detail.query;
+      if (query) {
+        setIsOpen(true);
+        setTimeout(() => {
+          handleSendMessage(query);
+        }, 150);
+      }
+    };
+    window.addEventListener('pmo-copilot-trigger', handleTrigger);
+    return () => window.removeEventListener('pmo-copilot-trigger', handleTrigger);
+  }, [tasks, projects, activeSpaceId, customApiKey, messages]);
+
   const handleSendMessage = async (textToSend: string) => {
     if (!textToSend.trim() || isLoading) return;
 
@@ -112,8 +129,10 @@ export const PmoCopilotWidget: React.FC<PmoCopilotWidgetProps> = ({
     }
 
     try {
-      // 3. Extraire le contexte compressé
-      const compressedContext = buildCopilotContext(tasks, projects, activeSpaceId);
+      // 3. Extraire le contexte compressé et l'alléger au maximum avant envoi
+      const contextObj = JSON.parse(buildCopilotContext(tasks, projects, activeSpaceId));
+      const optimizedContext = compressAndLightenJson(contextObj);
+      const compressedContext = JSON.stringify(optimizedContext);
 
       // 4. Prompt Système optimisé et consignes strictes
       const systemInstruction = `Tu es un Expert PMO Senior et Coach en Gestion de Projet. Ton rôle est d'assister le chef de projet au quotidien.

@@ -17,6 +17,7 @@ import {
   BookOpen,
   Archive,
   TrendingUp,
+  Search,
 } from 'lucide-react';
 import { Espace, Tache, Projet, ADMIN_EMAIL, ADMIN_UID } from '../types';
 import { WorkspaceSelector } from './WorkspaceSelector';
@@ -37,6 +38,7 @@ export interface HeaderProps {
   onOpenRecurringModal?: () => void;
   onOpenActivityReportModal?: () => void;
   onOpenTaskModal: () => void;
+  onOpenCommandPalette?: () => void;
   onExportJson: () => void;
   onImportJson: () => void;
   onLogout: () => void;
@@ -56,6 +58,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenRecurringModal,
   onOpenActivityReportModal,
   onOpenTaskModal,
+  onOpenCommandPalette,
   onExportJson,
   onImportJson,
   onLogout,
@@ -109,7 +112,7 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-base sm:text-lg font-medium tracking-tight text-[#1A1D1A]">
                   Gestionnaire de Tâches
                 </h1>
@@ -119,6 +122,16 @@ export const Header: React.FC<HeaderProps> = ({
                     <span>Admin</span>
                   </span>
                 )}
+                {/* Indicateur discret palette de commandes */}
+                <button
+                  type="button"
+                  onClick={onOpenCommandPalette}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-lg border border-[#F0EFEB] bg-[#FAF9F6] text-[10px] font-medium text-[#737873] hover:bg-[#F0EFEB] hover:text-[#1A1D1A] transition-all cursor-pointer select-none"
+                  title="Ouvrir la palette de commandes (Ctrl+K ou ⌘K)"
+                >
+                  <Search className="h-2.5 w-2.5 text-[#6B8E78]" />
+                  <span className="font-mono text-[9px] bg-white border border-[#EAE8E2] px-1 rounded-sm">⌘K</span>
+                </button>
               </div>
 
               <div className="flex items-center gap-2 text-xs text-[#737873] mt-0.5 font-light">

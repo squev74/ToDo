@@ -90,6 +90,7 @@ import { TaskFilterBar } from './components/TaskFilterBar';
 import { BacklogView } from './components/BacklogView';
 import { KnowledgeBaseView } from './components/KnowledgeBaseView';
 import { ArchivedTasksTab } from './components/ArchivedTasksTab';
+import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { getActiveTasks } from './utils/taskFilters';
 import { useTaskFiltersPersist } from './hooks/useTaskFiltersPersist';
 import {
@@ -338,8 +339,21 @@ export default function App() {
   const setSelectedStatuses = (val: StatutTache[] | null) => updateActiveFilters({ selectedStatuses: val });
 
   // Modales Tâche et Projet
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Tache | null>(null);
+
+  // Raccourci global Cmd+K / Ctrl+K pour ouvrir/fermer la palette de commandes
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [selectedProjectDetail, setSelectedProjectDetail] = useState<Projet | null>(null);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -1936,6 +1950,7 @@ export default function App() {
           setTaskModalDefaultStatus(currentView === 'backlog' ? 'Backlog' : 'Open');
           setIsTaskModalOpen(true);
         }}
+        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onExportJson={handleExportJson}
         onImportJson={handleTriggerFileInput}
         onLogout={handleLogout}
@@ -2346,6 +2361,31 @@ export default function App() {
         tasks={tasks}
         projects={projects}
         activeSpaceId={currentSpace.id}
+      />
+
+      {/* PALETTE DE COMMANDES GLOBALE (OMNIBOX) */}
+      <CommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        tasks={tasks}
+        projects={projects}
+        milestones={milestones}
+        activeSpaceId={currentSpace.id}
+        onViewChange={setCurrentView}
+        onSetPreferredTaskView={handleSetPreferredTaskView}
+        onOpenTaskModal={() => {
+          setEditingTask(null);
+          setTaskModalDefaultStatus(currentView === 'backlog' ? 'Backlog' : 'Open');
+          setIsTaskModalOpen(true);
+        }}
+        onEditTask={(t) => {
+          setEditingTask(t);
+          setTaskModalDefaultStatus(t.statut);
+          setIsTaskModalOpen(true);
+        }}
+        onSelectProject={(proj) => {
+          setSelectedProjectDetail(proj);
+        }}
       />
     </div>
   );
