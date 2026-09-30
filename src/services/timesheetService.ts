@@ -144,6 +144,40 @@ export function getSafeDocId(date: string, jiraKey: string): string {
 }
 
 /**
+ * Récupère une saisie de temps spécifique.
+ */
+export async function fetchTimeEntry(
+  userId: string,
+  date: string,
+  jiraKey: string
+): Promise<TimeEntry | null> {
+  const docId = getSafeDocId(date, jiraKey);
+  try {
+    const docRef = doc(db, 'users', userId, 'timeEntries', docId);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const data = snap.data();
+      return {
+        id: docId,
+        userId: data.userId || userId,
+        spaceId: data.spaceId || '',
+        jiraKey: data.jiraKey,
+        projectName: data.projectName,
+        date: data.date,
+        hours: Number(data.hours),
+        comment: data.comment || '',
+        userName: data.userName || '',
+        taskId: data.taskId || '',
+      };
+    }
+    return null;
+  } catch (error) {
+    console.warn('Erreur fetchTimeEntry:', error);
+    return null;
+  }
+}
+
+/**
  * Enregistre ou met à jour une saisie de temps dans Firestore.
  * Clé unique : YYYY-MM-DD_jiraKey (ex: 2026-09-18_EVOLIT-24)
  */

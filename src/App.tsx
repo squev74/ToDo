@@ -106,7 +106,7 @@ import { TaskKanbanBoard } from './components/tasks/TaskKanbanBoard';
 import { TimesheetGrid } from './components/TimesheetGrid';
 import { TimesheetReportModal } from './components/TimesheetReportModal';
 import { TimeEntry } from './types/timesheet';
-import { fetchMonthTimeEntries, saveTimeEntry, fetchAllTimeEntries } from './services/timesheetService';
+import { fetchMonthTimeEntries, saveTimeEntry, fetchAllTimeEntries, fetchTimeEntry } from './services/timesheetService';
 import { PmoCopilotWidget } from './components/PmoCopilotWidget';
 import { generateGlobalAlerts } from './utils/pmoHealthCheck';
 import { GlobalPmoAttentionWidget } from './components/GlobalPmoAttentionWidget';
@@ -446,18 +446,28 @@ export default function App() {
       const day = String(d.getDate()).padStart(2, '0');
       const todayStr = `${y}-${m}-${day}`;
 
-      const project = projects.find((p) => p.jiraKey === jiraKey);
+      const project = projects.find((p) => p.jiraKey === jiraKey || p.id === jiraKey);
       const projectName = project ? project.nom : 'Projet JIRA';
+
+      // Récupérer la saisie de temps existante pour aujourd'hui et ce projet
+      const existingEntry = await fetchTimeEntry(user.uid, todayStr, jiraKey);
+      const existingHours = existingEntry ? existingEntry.hours : 0;
+      const totalHours = existingHours + hours;
+
+      // Combiner le commentaire s'il y en a un existant pour ne pas le perdre
+      const finalComment = existingEntry && existingEntry.comment
+        ? `${existingEntry.comment} | ${comment}`
+        : comment;
 
       await saveTimeEntry(user.uid, activeSpaceId, {
         jiraKey,
         projectName,
         date: todayStr,
-        hours,
-        comment,
+        hours: totalHours,
+        comment: finalComment,
       });
 
-      showToast(`+${hours}h loggées sur ${jiraKey} pour aujourd'hui !`);
+      showToast(`+${hours}h ajoutées sur ${projectName} pour aujourd'hui (Total: ${totalHours}h) !`);
     } catch (err) {
       console.error('Erreur QuickLogTime:', err);
       showToast('Échec de la saisie rapide de temps.', 'error');
@@ -1964,6 +1974,7 @@ export default function App() {
           <BacklogView
             tasks={currentSpaceTasks}
             projects={currentSpaceProjects}
+            phases={phases}
             activeSpace={currentSpace}
             onStatusChange={handleStatusChangeRequest}
             onEditTask={(t) => {
@@ -2128,6 +2139,7 @@ export default function App() {
                         key={task.id}
                         task={task}
                         project={project}
+                        phases={phases}
                         index={index}
                         onStatusChangeRequest={handleStatusChangeRequest}
                         onStatusChange={handleStatusChangeRequest}

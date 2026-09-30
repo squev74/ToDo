@@ -15,7 +15,7 @@ import {
   Inbox,
   Sparkles,
 } from 'lucide-react';
-import { Tache, Projet, StatutTache } from '../types';
+import { Tache, Projet, StatutTache, ProjectPhase } from '../types';
 import { isTaskOverdue } from '../utils/storage';
 import {
   getTaskInactivityState,
@@ -26,6 +26,7 @@ import {
 export interface TaskCardProps {
   task: Tache;
   project?: Projet;
+  phases?: ProjectPhase[];
   index: number;
   onStatusChangeRequest?: (task: Tache, newStatus: StatutTache) => void;
   onStatusChange?: (task: Tache, newStatus: StatutTache) => void;
@@ -134,6 +135,7 @@ export function getProjectVibrantStyle(projectId: string, projectName: string, c
 export const TaskCard: React.FC<TaskCardProps> = ({
   task,
   project,
+  phases = [],
   index,
   onStatusChangeRequest,
   onStatusChange,
@@ -153,6 +155,11 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [newCommentText, setNewCommentText] = useState('');
   const [loggedHours, setLoggedHours] = useState<number | null>(null);
+
+  const associatedPhase = useMemo(() => {
+    if (!task.phaseId) return null;
+    return phases.find((p) => p.id === task.phaseId) || null;
+  }, [task.phaseId, phases]);
 
   // Handlers sécurisés
   const handleStatusChange = onStatusChangeRequest || onStatusChange || (() => {});
@@ -295,10 +302,29 @@ export const TaskCard: React.FC<TaskCardProps> = ({
 
         {/* CORPS DE LA CARTE : Titre et Badges Vifs */}
         <div className="flex-1 min-w-0 flex items-center flex-wrap sm:flex-nowrap gap-2">
-          {/* Titre de la tâche */}
+          {/* PASTILLE DE PROJET EN PREMIER (ALIGNÉE À GAUCHE DANS UN CONTENEUR DE LARGEUR FIXE) */}
+          <div className="w-36 sm:w-40 shrink-0 flex items-center pr-1.5">
+            {project && projectStyle ? (
+              <span
+                id={`task-project-badge-${task.id}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border shrink-0 truncate w-full shadow-2xs transition-transform hover:scale-[1.02] ${projectStyle.bg} ${projectStyle.text} ${projectStyle.border}`}
+                title={`Projet : ${project.nom}`}
+              >
+                <span
+                  className="h-2 w-2 rounded-full shrink-0 ring-1 ring-white/60 shadow-2xs"
+                  style={{ backgroundColor: projectStyle.dotColor }}
+                />
+                <span className="truncate">{project.nom}</span>
+              </span>
+            ) : (
+              <span className="text-xs text-slate-300 font-normal pl-2.5 italic">Sans projet</span>
+            )}
+          </div>
+
+          {/* Titre de la tâche (le Résumé, maintenant parfaitement aligné verticalement) */}
           <h4
             id={`task-title-${task.id}`}
-            className={`text-sm font-medium tracking-tight transition-colors duration-200 truncate leading-snug ${
+            className={`text-sm font-medium tracking-tight transition-colors duration-200 truncate leading-snug flex-1 ${
               isDone || isCancelled
                 ? 'line-through text-slate-400'
                 : 'text-slate-900 group-hover:text-black'
@@ -308,146 +334,123 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             {task.titre}
           </h4>
 
-          {/* BADGE DE STATUT VIF ET COLORÉ (Backlog, À faire, En cours, Bloqué, Terminé) */}
-          {!isBacklog && (
-            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-              <select
-                id={`task-status-select-${task.id}`}
-                value={task.statut}
-                onChange={(e) => {
-                  handleStatusChange(task, e.target.value as StatutTache);
-                }}
-                className={`rounded-lg border px-2.5 py-0.5 text-xs cursor-pointer transition-all duration-200 focus:outline-none shadow-2xs ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
-                title={task.cancellationReason ? `Motif d'annulation : ${task.cancellationReason}` : "Modifier le statut"}
-              >
-                <option value="Backlog" className="bg-white text-purple-700 font-semibold">Backlog</option>
-                <option value="Open" className="bg-white text-sky-600 font-medium">À Faire</option>
-                <option value="In Progress" className="bg-white text-amber-900 font-semibold">En Cours</option>
-                <option value="Blocked" className="bg-white text-red-600 font-bold">Bloqué</option>
-                <option value="Done" className="bg-white text-emerald-600 font-medium">Terminé</option>
-                <option value="Cancelled" className="bg-white text-rose-600 font-medium">Annulé</option>
-              </select>
-            </div>
-          )}
+          {/* CONTENEUR DE BADGES SECONDAIRES À DROITE */}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
+            {/* BADGE DE STATUT VIF ET COLORÉ (Backlog, À faire, En cours, Bloqué, Terminé) */}
+            {!isBacklog && (
+              <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                <select
+                  id={`task-status-select-${task.id}`}
+                  value={task.statut}
+                  onChange={(e) => {
+                    handleStatusChange(task, e.target.value as StatutTache);
+                  }}
+                  className={`rounded-lg border px-2.5 py-0.5 text-xs cursor-pointer transition-all duration-200 focus:outline-none shadow-2xs ${statusCfg.bg} ${statusCfg.text} ${statusCfg.border}`}
+                  title={task.cancellationReason ? `Motif d'annulation : ${task.cancellationReason}` : "Modifier le statut"}
+                >
+                  <option value="Backlog" className="bg-white text-purple-700 font-semibold">Backlog</option>
+                  <option value="Open" className="bg-white text-sky-600 font-medium">À Faire</option>
+                  <option value="In Progress" className="bg-white text-amber-900 font-semibold">En Cours</option>
+                  <option value="Blocked" className="bg-white text-red-600 font-bold">Bloqué</option>
+                  <option value="Done" className="bg-white text-emerald-600 font-medium">Terminé</option>
+                  <option value="Cancelled" className="bg-white text-rose-600 font-medium">Annulé</option>
+                </select>
+              </div>
+            )}
 
-          {/* PASTILLE DE PROJET DYNAMIQUE & SATURÉE (Indigo, Teal, Rose, Lime, Cyan, etc.) */}
-          {project && projectStyle && (
-            <span
-              id={`task-project-badge-${task.id}`}
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold border shrink-0 truncate max-w-[150px] shadow-2xs transition-transform hover:scale-[1.02] ${projectStyle.bg} ${projectStyle.text} ${projectStyle.border}`}
-              title={`Projet : ${project.nom}`}
-            >
+            {/* HIGHLIGHT ALERTE TÂCHE EN RETARD (Badge Rouge Vif Néon) */}
+            {isOverdue && (
               <span
-                className="h-2 w-2 rounded-full shrink-0 ring-1 ring-white/60 shadow-2xs"
-                style={{ backgroundColor: projectStyle.dotColor }}
-              />
-              <span className="truncate">{project.nom}</span>
-            </span>
-          )}
+                id={`task-overdue-tag-${task.id}`}
+                className="inline-flex items-center gap-1 bg-rose-600 text-white px-2 py-0.5 rounded-md font-bold text-xs shadow-xs animate-pulse shrink-0 tracking-wide"
+                title="Alerte : Date d'échéance dépassée !"
+              >
+                <AlertTriangle className="h-3.5 w-3.5 stroke-[2.5]" />
+                <span>EN RETARD</span>
+              </span>
+            )}
 
-          {/* BADGE DE CLÉ JIRA SI PRÉSENT */}
-          {task.jiraKey && (
-            <span
-              id={`task-jirakey-badge-${task.id}`}
-              className="inline-flex items-center gap-1 bg-indigo-600 text-white px-2 py-0.5 rounded-md font-bold text-[10px] shadow-2xs shrink-0 tracking-wider transition-transform hover:scale-105"
-              title={`Clé JIRA associée : ${task.jiraKey}. Cliquer pour déplier et imputer du temps rapidement.`}
-            >
-              <span>{task.jiraKey}</span>
-            </span>
-          )}
+            {/* Échéance bien visible & contrastée */}
+            {task.dateEcheance && (
+              <span
+                id={`task-date-badge-${task.id}`}
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs border shrink-0 ${
+                  isOverdue
+                    ? 'border-rose-400 bg-rose-100 text-rose-800 font-bold shadow-2xs'
+                    : 'border-slate-200 bg-slate-100 text-slate-700 font-medium'
+                }`}
+                title={`Échéance : ${task.dateEcheance}${isOverdue ? ' (En retard)' : ''}`}
+              >
+                {isOverdue ? (
+                  <AlertTriangle className="h-3.5 w-3.5 text-rose-600 stroke-[2.5]" />
+                ) : (
+                  <Calendar className="h-3.5 w-3.5 text-slate-500" />
+                )}
+                <span>{formatDateOnly(task.dateEcheance)}</span>
+              </span>
+            )}
 
-          {/* HIGHLIGHT ALERTE TÂCHE EN RETARD (Badge Rouge Vif Néon) */}
-          {isOverdue && (
-            <span
-              id={`task-overdue-tag-${task.id}`}
-              className="inline-flex items-center gap-1 bg-rose-600 text-white px-2 py-0.5 rounded-md font-bold text-xs shadow-xs animate-pulse shrink-0 tracking-wide"
-              title="Alerte : Date d'échéance dépassée !"
-            >
-              <AlertTriangle className="h-3.5 w-3.5 stroke-[2.5]" />
-              <span>EN RETARD</span>
-            </span>
-          )}
+            {/* Badge de réveil planifié pour le Backlog */}
+            {isBacklog && task.activationDate && (
+              <span
+                id={`task-activation-badge-${task.id}`}
+                className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 text-purple-800 px-2.5 py-0.5 text-xs font-semibold shrink-0"
+                title={`Réveil programmé le : ${task.activationDate}`}
+              >
+                <Clock className="h-3.5 w-3.5 text-purple-600" />
+                <span>Réveil : {formatDateOnly(task.activationDate)}</span>
+              </span>
+            )}
 
-          {/* Échéance bien visible & contrastée */}
-          {task.dateEcheance && (
-            <span
-              id={`task-date-badge-${task.id}`}
-              className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs border shrink-0 ${
-                isOverdue
-                  ? 'border-rose-400 bg-rose-100 text-rose-800 font-bold shadow-2xs'
-                  : 'border-slate-200 bg-slate-100 text-slate-700 font-medium'
-              }`}
-              title={`Échéance : ${task.dateEcheance}${isOverdue ? ' (En retard)' : ''}`}
-            >
-              {isOverdue ? (
-                <AlertTriangle className="h-3.5 w-3.5 text-rose-600 stroke-[2.5]" />
-              ) : (
-                <Calendar className="h-3.5 w-3.5 text-slate-500" />
-              )}
-              <span>{formatDateOnly(task.dateEcheance)}</span>
-            </span>
-          )}
+            {/* Tag inactivité prolongée (si >= 7j et non terminée) */}
+            {!isOverdue && !isDone && inactivityState.isApplicable && inactivityState.days >= 7 && (
+              <span
+                id={`task-inactivity-alert-${task.id}`}
+                className="inline-flex items-center gap-1 rounded-md bg-amber-500 text-white px-2 py-0.5 text-xs font-bold shrink-0 shadow-2xs"
+                title={`Tâche inactive depuis ${inactivityState.days} jours (${inactivityState.label})`}
+              >
+                <Clock className="h-3 w-3 stroke-[2.5]" />
+                <span>{inactivityState.days}j inactif</span>
+              </span>
+            )}
 
-          {/* Badge de réveil planifié pour le Backlog */}
-          {isBacklog && task.activationDate && (
-            <span
-              id={`task-activation-badge-${task.id}`}
-              className="inline-flex items-center gap-1 rounded-lg border border-purple-200 bg-purple-50 text-purple-800 px-2.5 py-0.5 text-xs font-semibold shrink-0"
-              title={`Réveil programmé le : ${task.activationDate}`}
-            >
-              <Clock className="h-3.5 w-3.5 text-purple-600" />
-              <span>Réveil : {formatDateOnly(task.activationDate)}</span>
-            </span>
-          )}
-
-          {/* Tag inactivité prolongée (si >= 7j et non terminée) */}
-          {!isOverdue && !isDone && inactivityState.isApplicable && inactivityState.days >= 7 && (
-            <span
-              id={`task-inactivity-alert-${task.id}`}
-              className="inline-flex items-center gap-1 rounded-md bg-amber-500 text-white px-2 py-0.5 text-xs font-bold shrink-0 shadow-2xs"
-              title={`Tâche inactive depuis ${inactivityState.days} jours (${inactivityState.label})`}
-            >
-              <Clock className="h-3 w-3 stroke-[2.5]" />
-              <span>{inactivityState.days}j inactif</span>
-            </span>
-          )}
-
-          {/* Indicateur d'inactivité régulier (si < 7j) */}
-          {inactivityState.isApplicable && (!isOverdue && inactivityState.days < 7) && (
-            <div
-              id={`task-inactivity-indicator-${task.id}`}
-              className="relative group/inactivity inline-flex items-center shrink-0"
-              title={inactivityState.label}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600 cursor-help hover:bg-slate-100 transition-colors">
-                <Clock className="h-3 w-3 text-slate-500" />
-                <span className="font-medium">
-                  {inactivityState.days === 0 ? '< 1j' : `${inactivityState.days}j`}
-                </span>
-              </div>
-
-              {/* Bulle d'information */}
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/inactivity:flex flex-col items-center pointer-events-none z-30 whitespace-nowrap">
-                <div className="bg-slate-900 text-white text-xs font-normal px-2.5 py-1 rounded-lg shadow-md flex items-center gap-1.5">
-                  <Clock className="h-3 w-3 text-emerald-400" />
-                  <span>{inactivityState.label}</span>
+            {/* Indicateur d'inactivité régulier (si < 7j) */}
+            {inactivityState.isApplicable && (!isOverdue && inactivityState.days < 7) && (
+              <div
+                id={`task-inactivity-indicator-${task.id}`}
+                className="relative group/inactivity inline-flex items-center shrink-0"
+                title={inactivityState.label}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] text-slate-600 cursor-help hover:bg-slate-100 transition-colors">
+                  <Clock className="h-3 w-3 text-slate-500" />
+                  <span className="font-medium">
+                    {inactivityState.days === 0 ? '< 1j' : `${inactivityState.days}j`}
+                  </span>
                 </div>
-                <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5" />
-              </div>
-            </div>
-          )}
 
-          {/* Commentaires */}
-          {task.commentaires && task.commentaires.length > 0 && (
-            <span
-              className="inline-flex items-center gap-1 text-xs text-slate-500 font-medium shrink-0 ml-0.5"
-              title={`${task.commentaires.length} note(s) ou commentaire(s)`}
-            >
-              <MessageSquare className="h-3.5 w-3.5 text-slate-400" />
-              <span>{task.commentaires.length}</span>
-            </span>
-          )}
+                {/* Bulle d'information */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/inactivity:flex flex-col items-center pointer-events-none z-30 whitespace-nowrap">
+                  <div className="bg-slate-900 text-white text-xs font-normal px-2.5 py-1 rounded-lg shadow-md flex items-center gap-1.5">
+                    <Clock className="h-3 w-3 text-emerald-400" />
+                    <span>{inactivityState.label}</span>
+                  </div>
+                  <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5" />
+                </div>
+              </div>
+            )}
+
+            {/* Commentaires */}
+            {task.commentaires && task.commentaires.length > 0 && (
+              <span
+                className="inline-flex items-center gap-1 text-xs text-slate-500 font-medium shrink-0 ml-0.5"
+                title={`${task.commentaires.length} note(s) ou commentaire(s)`}
+              >
+                <MessageSquare className="h-3.5 w-3.5 text-slate-400" />
+                <span>{task.commentaires.length}</span>
+              </span>
+            )}
+          </div>
         </div>
 
         {/* ACTIONS SECONDAIRES À DROITE */}
@@ -538,6 +541,43 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             )}
           </div>
 
+          {/* Phase de projet associée */}
+          {associatedPhase && (
+            <div className="animate-in fade-in duration-200">
+              <h5 className="text-xs font-semibold uppercase tracking-wider text-[#5B7083] mb-1.5 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: associatedPhase.color || '#6B8E78' }} />
+                Phase de projet associée
+              </h5>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 shadow-2xs">
+                <span className="font-semibold text-slate-950">{associatedPhase.name}</span>
+                {associatedPhase.startDate && associatedPhase.endDate && (
+                  <span className="text-slate-500 flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Période : {formatDateOnly(associatedPhase.startDate)} au {formatDateOnly(associatedPhase.endDate)}
+                  </span>
+                )}
+                {associatedPhase.jiraEpicKey && (
+                  <span className="inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md font-bold text-[10px]">
+                    ⚡ Epic JIRA : {associatedPhase.jiraEpicKey}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Ticket JIRA associé */}
+          {task.jiraKey && (
+            <div className="animate-in fade-in duration-200">
+              <h5 className="text-xs font-semibold uppercase tracking-wider text-indigo-700 mb-1.5 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-indigo-600" />
+                Ticket JIRA / Phase JIRA
+              </h5>
+              <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 px-3 py-1.5 rounded-xl font-bold text-xs shadow-2xs">
+                <span>⚡ {task.jiraKey}</span>
+              </div>
+            </div>
+          )}
+
           {/* Raison d'annulation (si renseignée) */}
           {task.cancellationReason && (
             <div>
@@ -577,55 +617,62 @@ export const TaskCard: React.FC<TaskCardProps> = ({
             })()}
           </div>
 
-          {/* SAISIE DU TEMPS RAPIDE JIRA */}
-          {task.jiraKey && (
-            <div
-              id={`task-quick-time-tracker-${task.id}`}
-              className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-2.5 transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <h5 className="text-xs font-semibold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-indigo-500" />
-                  Saisie de temps rapide (JIRA : {task.jiraKey})
-                </h5>
-                <span className="text-[10px] text-indigo-600/70">Aujourd&apos;hui</span>
-              </div>
+          {/* SAISIE DU TEMPS RAPIDE */}
+          {(() => {
+            const quickLogKey = project ? (project.jiraKey || project.id) : task.jiraKey;
+            const quickLogLabel = project ? `Projet : ${project.nom}` : (task.jiraKey ? `JIRA : ${task.jiraKey}` : null);
+            
+            if (!quickLogKey) return null;
 
-              {loggedHours !== null ? (
-                <div className="flex items-center gap-2 rounded-lg bg-emerald-500 text-white px-3 py-1.5 text-xs font-semibold animate-in fade-in duration-150">
-                  <Check className="h-4 w-4 stroke-[2.5]" />
-                  <span>+{loggedHours}h loggées avec succès sur {task.jiraKey} !</span>
+            return (
+              <div
+                id={`task-quick-time-tracker-${task.id}`}
+                className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4 space-y-2.5 transition-all"
+              >
+                <div className="flex items-center justify-between">
+                  <h5 className="text-xs font-semibold uppercase tracking-wider text-indigo-700 flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-indigo-500" />
+                    Saisie de temps rapide ({quickLogLabel})
+                  </h5>
+                  <span className="text-[10px] text-indigo-600/70">Aujourd&apos;hui</span>
                 </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-slate-600 mr-1 font-medium">Imputer :</span>
-                  {[1, 2, 4].map((hours) => (
-                    <button
-                      key={hours}
-                      type="button"
-                      onClick={() => {
-                        if (onQuickLogTime) {
-                          onQuickLogTime(
-                            task.jiraKey!,
-                            hours,
-                            `Imputation rapide depuis la tâche : ${task.titre}`
-                          );
-                          setLoggedHours(hours);
-                          setTimeout(() => setLoggedHours(null), 2500);
-                        }
-                      }}
-                      className="inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 active:scale-95 transition-all cursor-pointer shadow-2xs"
-                    >
-                      +{hours}h
-                    </button>
-                  ))}
-                  <p className="text-[10px] text-slate-500 italic ml-auto shrink-0">
-                    S&apos;ajoute à votre feuille de temps mensuelle
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
+
+                {loggedHours !== null ? (
+                  <div className="flex items-center gap-2 rounded-lg bg-emerald-500 text-white px-3 py-1.5 text-xs font-semibold animate-in fade-in duration-150">
+                    <Check className="h-4 w-4 stroke-[2.5]" />
+                    <span>+{loggedHours}h ajoutées avec succès sur {project ? project.nom : quickLogKey} !</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-slate-600 mr-1 font-medium">Imputer :</span>
+                    {[1, 2, 4].map((hours) => (
+                      <button
+                        key={hours}
+                        type="button"
+                        onClick={() => {
+                          if (onQuickLogTime) {
+                            onQuickLogTime(
+                              quickLogKey,
+                              hours,
+                              `Imputation rapide depuis la tâche : ${task.titre}`
+                            );
+                            setLoggedHours(hours);
+                            setTimeout(() => setLoggedHours(null), 2500);
+                          }
+                        }}
+                        className="inline-flex items-center justify-center rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600 active:scale-95 transition-all cursor-pointer shadow-2xs"
+                      >
+                        +{hours}h
+                      </button>
+                    ))}
+                    <p className="text-[10px] text-slate-500 italic ml-auto shrink-0">
+                      S&apos;ajoute à votre feuille de temps mensuelle
+                    </p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Fil de commentaires */}
           <div className="pt-2 border-t border-slate-200 space-y-2.5">

@@ -8,13 +8,14 @@ import {
   Sparkles,
   RotateCcw,
 } from 'lucide-react';
-import { Tache, Projet, Espace, StatutTache } from '../types';
+import { Tache, Projet, Espace, StatutTache, ProjectPhase } from '../types';
 import { TaskCard } from './TaskCard';
 import { AiBacklogPrioritizer } from './AiBacklogPrioritizer';
 
 export interface BacklogViewProps {
   tasks: Tache[];
   projects: Projet[];
+  phases?: ProjectPhase[];
   activeSpace?: Espace;
   onStatusChange: (task: Tache, newStatus: StatutTache) => void;
   onEditTask: (task: Tache) => void;
@@ -28,6 +29,7 @@ export interface BacklogViewProps {
 export const BacklogView: React.FC<BacklogViewProps> = ({
   tasks,
   projects,
+  phases = [],
   activeSpace,
   onStatusChange,
   onEditTask,
@@ -409,6 +411,7 @@ export const BacklogView: React.FC<BacklogViewProps> = ({
                 key={task.id}
                 task={task}
                 project={project}
+                phases={phases}
                 index={index}
                 onStatusChange={onStatusChange}
                 onEditTask={onEditTask}
