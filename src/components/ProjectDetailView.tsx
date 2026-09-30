@@ -16,7 +16,8 @@ import {
   Plus,
   Trash2,
   CheckCircle2,
-  Check
+  Check,
+  Pencil
 } from 'lucide-react';
 import { Projet, Tache, ProjectDeliverable, TeamMember, MonthlyAllocation, RaidItem, Milestone, ProjectPhase } from '../types';
 import { ProjectDeliverablesSection } from './ProjectDeliverablesSection';
@@ -99,6 +100,21 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
   const [pEpicKey, setPEpicKey] = useState('');
   const [pEpicUrl, setPEpicUrl] = useState('');
   const [pError, setPError] = useState('');
+
+  // Edition de jalon (Milestone)
+  const [editingMilestoneId, setEditingMilestoneId] = useState<string | null>(null);
+  const [editMTitle, setEditMTitle] = useState('');
+  const [editMDate, setEditMDate] = useState('');
+  const [editMDesc, setEditMDesc] = useState('');
+
+  // Edition de phase de projet
+  const [editingPhaseId, setEditingPhaseId] = useState<string | null>(null);
+  const [editPName, setEditPName] = useState('');
+  const [editPStart, setEditPStart] = useState('');
+  const [editPEnd, setEditPEnd] = useState('');
+  const [editPColor, setEditPColor] = useState('#D9E4DD');
+  const [editPEpicKey, setEditPEpicKey] = useState('');
+  const [editPEpicUrl, setEditPEpicUrl] = useState('');
 
   // Filtrer les tâches liées à ce projet
   const projectTasks = useMemo(() => {
@@ -974,50 +990,125 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         </div>
                       ) : (
                         <div className="space-y-3.5 max-h-96 overflow-y-auto pr-1">
-                          {projectMilestones.map((m) => (
-                            <div
-                              key={m.id}
-                              className="rounded-xl border border-[#F0EFEB] bg-[#FAF9F6]/50 p-4 flex items-start justify-between gap-4 hover:border-[#E2DFD8] transition-colors"
-                            >
-                              <div className="flex items-start gap-3 min-w-0">
-                                <button
-                                  type="button"
-                                  onClick={() => toggleMilestoneCompletion(m)}
-                                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all ${
-                                    m.completed
-                                      ? 'bg-[#6B8E78] border-[#6B8E78] text-white'
-                                      : 'border-[#EAE8E2] bg-white hover:border-[#6B8E78]'
-                                  }`}
+                          {projectMilestones.map((m) => {
+                            const isEditing = editingMilestoneId === m.id;
+                            if (isEditing) {
+                              return (
+                                <div
+                                  key={m.id}
+                                  className="rounded-xl border border-[#6B8E78] bg-white p-4 space-y-3"
                                 >
-                                  {m.completed && <Check className="h-3 w-3 stroke-[3]" />}
-                                </button>
-
-                                <div className="min-w-0 space-y-1">
-                                  <h5 className={`text-xs font-bold text-[#1A1D1A] ${m.completed ? 'line-through text-[#737873]' : ''}`}>
-                                    {m.title}
-                                  </h5>
-                                  {m.description && (
-                                    <p className="text-[11px] text-[#737873] font-light leading-relaxed">
-                                      {m.description}
-                                    </p>
-                                  )}
-                                  <div className="flex items-center gap-1.5 text-[10px] text-[#737873] font-medium pt-0.5">
-                                    <Calendar className="h-3.5 w-3.5 text-[#737873]" />
-                                    <span>{new Date(m.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                  <div className="space-y-2">
+                                    <input
+                                      type="text"
+                                      className="w-full rounded-lg border border-[#F0EFEB] bg-white p-2 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78] font-bold"
+                                      value={editMTitle}
+                                      onChange={(e) => setEditMTitle(e.target.value)}
+                                      placeholder="Titre du Jalon *"
+                                    />
+                                    <input
+                                      type="date"
+                                      className="w-full rounded-lg border border-[#F0EFEB] bg-white p-2 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                                      value={editMDate}
+                                      onChange={(e) => setEditMDate(e.target.value)}
+                                    />
+                                    <textarea
+                                      className="w-full rounded-lg border border-[#F0EFEB] bg-white p-2 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78] resize-none"
+                                      value={editMDesc}
+                                      onChange={(e) => setEditMDesc(e.target.value)}
+                                      placeholder="Description / Objectif"
+                                      rows={2}
+                                    />
+                                  </div>
+                                  <div className="flex justify-end gap-2 text-xs font-bold">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingMilestoneId(null)}
+                                      className="px-3 py-1.5 rounded-lg border border-[#F0EFEB] text-[#737873] hover:bg-slate-50 hover:text-[#1A1D1A] transition-colors"
+                                    >
+                                      Annuler
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!editMTitle.trim() || !editMDate) return;
+                                        onSaveMilestone({
+                                          ...m,
+                                          title: editMTitle.trim(),
+                                          date: editMDate,
+                                          description: editMDesc.trim() || undefined,
+                                        });
+                                        setEditingMilestoneId(null);
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-[#6B8E78] text-white hover:bg-[#5D7C68] transition-colors"
+                                    >
+                                      Enregistrer
+                                    </button>
                                   </div>
                                 </div>
-                              </div>
+                              );
+                            }
 
-                              <button
-                                type="button"
-                                onClick={() => onDeleteMilestone(m.id)}
-                                className="rounded-lg p-1.5 text-[#737873] hover:bg-rose-50 hover:text-rose-600 transition-colors shrink-0"
-                                title="Supprimer le jalon"
+                            return (
+                              <div
+                                key={m.id}
+                                className="rounded-xl border border-[#F0EFEB] bg-[#FAF9F6]/50 p-4 flex items-start justify-between gap-4 hover:border-[#E2DFD8] transition-colors"
                               >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ))}
+                                <div className="flex items-start gap-3 min-w-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleMilestoneCompletion(m)}
+                                    className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all ${
+                                      m.completed
+                                        ? 'bg-[#6B8E78] border-[#6B8E78] text-white'
+                                        : 'border-[#EAE8E2] bg-white hover:border-[#6B8E78]'
+                                    }`}
+                                  >
+                                    {m.completed && <Check className="h-3 w-3 stroke-[3]" />}
+                                  </button>
+
+                                  <div className="min-w-0 space-y-1">
+                                    <h5 className={`text-xs font-bold text-[#1A1D1A] ${m.completed ? 'line-through text-[#737873]' : ''}`}>
+                                      {m.title}
+                                    </h5>
+                                    {m.description && (
+                                      <p className="text-[11px] text-[#737873] font-light leading-relaxed">
+                                        {m.description}
+                                      </p>
+                                    )}
+                                    <div className="flex items-center gap-1.5 text-[10px] text-[#737873] font-medium pt-0.5">
+                                      <Calendar className="h-3.5 w-3.5 text-[#737873]" />
+                                      <span>{new Date(m.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingMilestoneId(m.id);
+                                      setEditMTitle(m.title);
+                                      setEditMDate(m.date);
+                                      setEditMDesc(m.description || '');
+                                    }}
+                                    className="rounded-lg p-1.5 text-[#737873] hover:bg-slate-50 hover:text-[#1A1D1A] transition-colors"
+                                    title="Modifier le jalon"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteMilestone(m.id)}
+                                    className="rounded-lg p-1.5 text-[#737873] hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                    title="Supprimer le jalon"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
@@ -1107,53 +1198,206 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                         </div>
                       ) : (
                         <div className="space-y-3.5 max-h-96 overflow-y-auto pr-1">
-                          {projectPhases.map((p) => (
-                            <div
-                              key={p.id}
-                              className="rounded-xl border border-[#F0EFEB] bg-[#FAF9F6]/50 p-4 flex items-start justify-between gap-4 hover:border-[#E2DFD8] transition-colors"
-                            >
-                              <div className="flex items-start gap-3 min-w-0">
-                                <span
-                                  className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0 mt-1"
-                                  style={{ backgroundColor: p.color || '#D9E4DD' }}
-                                />
-                                <div className="min-w-0 space-y-1">
-                                  <h5 className="text-xs font-bold text-[#1A1D1A]">
-                                    {p.name}
-                                  </h5>
-                                  <div className="flex items-center gap-4 text-[10px] text-[#737873] font-medium">
-                                    <div className="flex items-center gap-1">
-                                      <Calendar className="h-3.5 w-3.5" />
-                                      <span>Du {new Date(p.startDate).toLocaleDateString('fr-FR')} au {new Date(p.endDate).toLocaleDateString('fr-FR')}</span>
+                          {projectPhases.map((p) => {
+                            const isEditing = editingPhaseId === p.id;
+                            if (isEditing) {
+                              return (
+                                <div
+                                  key={p.id}
+                                  className="rounded-xl border border-[#6B8E78] bg-white p-4 space-y-3"
+                                >
+                                  <div className="space-y-2.5">
+                                    <div className="space-y-1">
+                                      <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                                        Nom de la Phase *
+                                      </label>
+                                      <input
+                                        type="text"
+                                        className="w-full rounded-lg border border-[#F0EFEB] bg-white p-2 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78] font-bold"
+                                        value={editPName}
+                                        onChange={(e) => setEditPName(e.target.value)}
+                                        placeholder="Ex: Cadrage & Architecture"
+                                      />
                                     </div>
-                                    {p.jiraEpicKey && (
-                                      <span
-                                        className="font-mono text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded cursor-pointer hover:bg-indigo-100"
-                                        onClick={() => {
-                                          if (p.jiraEpicUrl) {
-                                            window.open(p.jiraEpicUrl, '_blank');
-                                          } else {
-                                            window.open(`https://jira.company.com/browse/${p.jiraEpicKey}`, '_blank');
-                                          }
-                                        }}
-                                      >
-                                        ⚡ Epic JIRA : {p.jiraEpicKey}
-                                      </span>
-                                    )}
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="space-y-1">
+                                        <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                                          Date Début *
+                                        </label>
+                                        <input
+                                          type="date"
+                                          className="w-full rounded-lg border border-[#F0EFEB] bg-white p-2 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                                          value={editPStart}
+                                          onChange={(e) => setEditPStart(e.target.value)}
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                                          Date Fin *
+                                        </label>
+                                        <input
+                                          type="date"
+                                          className="w-full rounded-lg border border-[#F0EFEB] bg-white p-2 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                                          value={editPEnd}
+                                          onChange={(e) => setEditPEnd(e.target.value)}
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                      <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                                        Nuance Japandi
+                                      </label>
+                                      <div className="flex items-center gap-2">
+                                        {[
+                                          { label: 'Sauge', hex: '#D9E4DD' },
+                                          { label: 'Sable', hex: '#EAE2D8' },
+                                          { label: 'Argile', hex: '#F1E3D3' },
+                                          { label: 'Lin', hex: '#E3D5CA' },
+                                          { label: 'Ciel', hex: '#D0E1FD' },
+                                        ].map((col) => (
+                                          <button
+                                            key={col.hex}
+                                            type="button"
+                                            onClick={() => setEditPColor(col.hex)}
+                                            className={`h-6 w-6 rounded-full border flex items-center justify-center transition-all ${
+                                              editPColor === col.hex
+                                                ? 'border-[#1A1D1A] scale-110 shadow-xs'
+                                                : 'border-transparent hover:scale-105'
+                                            }`}
+                                            style={{ backgroundColor: col.hex }}
+                                            title={col.label}
+                                          >
+                                            {editPColor === col.hex && <Check className="h-3 w-3 text-black" />}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <div className="space-y-1">
+                                        <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                                          Clé d&apos;Épic JIRA (Optionnel)
+                                        </label>
+                                        <input
+                                          type="text"
+                                          className="w-full rounded-lg border border-[#F0EFEB] bg-white p-2 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                                          value={editPEpicKey}
+                                          onChange={(e) => setEditPEpicKey(e.target.value)}
+                                          placeholder="PMO-102"
+                                        />
+                                      </div>
+                                      <div className="space-y-1">
+                                        <label className="text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                                          URL de l&apos;Épic JIRA (Optionnel)
+                                        </label>
+                                        <input
+                                          type="url"
+                                          className="w-full rounded-lg border border-[#F0EFEB] bg-white p-2 text-xs text-[#1A1D1A] outline-hidden focus:border-[#6B8E78]"
+                                          value={editPEpicUrl}
+                                          onChange={(e) => setEditPEpicUrl(e.target.value)}
+                                          placeholder="https://..."
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex justify-end gap-2 text-xs font-bold pt-2 border-t border-[#F0EFEB]">
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingPhaseId(null)}
+                                      className="px-3 py-1.5 rounded-lg border border-[#F0EFEB] text-[#737873] hover:bg-slate-50 hover:text-[#1A1D1A] transition-colors"
+                                    >
+                                      Annuler
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!editPName.trim() || !editPStart || !editPEnd) return;
+                                        if (editPStart > editPEnd) return;
+                                        onSavePhase({
+                                          ...p,
+                                          name: editPName.trim(),
+                                          startDate: editPStart,
+                                          endDate: editPEnd,
+                                          color: editPColor,
+                                          jiraEpicKey: editPEpicKey.trim() || undefined,
+                                          jiraEpicUrl: editPEpicUrl.trim() || undefined,
+                                        });
+                                        setEditingPhaseId(null);
+                                      }}
+                                      className="px-3 py-1.5 rounded-lg bg-[#6B8E78] text-white hover:bg-[#5D7C68] transition-colors"
+                                    >
+                                      Enregistrer
+                                    </button>
                                   </div>
                                 </div>
-                              </div>
+                              );
+                            }
 
-                              <button
-                                type="button"
-                                onClick={() => onDeletePhase(p.id)}
-                                className="rounded-lg p-1.5 text-[#737873] hover:bg-rose-50 hover:text-rose-600 transition-colors shrink-0"
-                                title="Supprimer la phase"
+                            return (
+                              <div
+                                key={p.id}
+                                className="rounded-xl border border-[#F0EFEB] bg-[#FAF9F6]/50 p-4 flex items-start justify-between gap-4 hover:border-[#E2DFD8] transition-colors"
                               >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            </div>
-                          ))}
+                                <div className="flex items-start gap-3 min-w-0">
+                                  <span
+                                    className="w-3.5 h-3.5 rounded-full border border-black/10 shrink-0 mt-1"
+                                    style={{ backgroundColor: p.color || '#D9E4DD' }}
+                                  />
+                                  <div className="min-w-0 space-y-1">
+                                    <h5 className="text-xs font-bold text-[#1A1D1A]">
+                                      {p.name}
+                                    </h5>
+                                    <div className="flex items-center gap-4 text-[10px] text-[#737873] font-medium">
+                                      <div className="flex items-center gap-1">
+                                        <Calendar className="h-3.5 w-3.5" />
+                                        <span>Du {new Date(p.startDate).toLocaleDateString('fr-FR')} au {new Date(p.endDate).toLocaleDateString('fr-FR')}</span>
+                                      </div>
+                                      {p.jiraEpicKey && (
+                                        <span
+                                          className="font-mono text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded cursor-pointer hover:bg-indigo-100"
+                                          onClick={() => {
+                                            if (p.jiraEpicUrl) {
+                                              window.open(p.jiraEpicUrl, '_blank');
+                                            } else {
+                                              window.open(`https://jira.company.com/browse/${p.jiraEpicKey}`, '_blank');
+                                            }
+                                          }}
+                                        >
+                                          ⚡ Epic JIRA : {p.jiraEpicKey}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1 shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingPhaseId(p.id);
+                                      setEditPName(p.name);
+                                      setEditPStart(p.startDate);
+                                      setEditPEnd(p.endDate);
+                                      setEditPColor(p.color || '#D9E4DD');
+                                      setEditPEpicKey(p.jiraEpicKey || '');
+                                      setEditPEpicUrl(p.jiraEpicUrl || '');
+                                    }}
+                                    className="rounded-lg p-1.5 text-[#737873] hover:bg-slate-50 hover:text-[#1A1D1A] transition-colors"
+                                    title="Modifier la phase"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeletePhase(p.id)}
+                                    className="rounded-lg p-1.5 text-[#737873] hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                    title="Supprimer la phase"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
