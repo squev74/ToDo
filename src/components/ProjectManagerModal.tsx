@@ -2,14 +2,15 @@ import React, { useState } from 'react';
 import { X, Plus, Trash2, Folder, Check, Edit2, Eye } from 'lucide-react';
 import { Projet, Tache, Espace } from '../types';
 import { getWorkspaceIconComponent } from '../utils/workspaceIcons';
+import { calculateProjectMetrics } from '../utils/projectMetrics';
 
 interface ProjectManagerModalProps {
   isOpen: boolean;
   projects: Projet[];
   tasks: Tache[];
   activeSpace?: Espace;
-  onAddProject: (nom: string, couleur: string, jiraKey?: string) => void;
-  onUpdateProject: (id: string, nom: string, couleur: string, jiraKey?: string) => void;
+  onAddProject: (nom: string, couleur: string, jiraKey?: string, startDate?: string, endDate?: string) => void;
+  onUpdateProject: (id: string, nom: string, couleur: string, jiraKey?: string, startDate?: string, endDate?: string) => void;
   onRequestDeleteProject: (projet: Projet) => void;
   onClose: () => void;
   onOpenProjectDetail?: (project: Projet) => void;
@@ -41,6 +42,8 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
 }) => {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectJira, setNewProjectJira] = useState('');
+  const [newProjectStart, setNewProjectStart] = useState('');
+  const [newProjectEnd, setNewProjectEnd] = useState('');
   const [selectedColor, setSelectedColor] = useState(PRESET_COLORS[0]);
   const [error, setError] = useState('');
 
@@ -49,6 +52,8 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
   const [editName, setEditName] = useState('');
   const [editJiraKey, setEditJiraKey] = useState('');
   const [editColor, setEditColor] = useState('');
+  const [editStart, setEditStart] = useState('');
+  const [editEnd, setEditEnd] = useState('');
   const [editError, setEditError] = useState('');
 
   if (!isOpen) return null;
@@ -70,10 +75,22 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
       setError('Un projet avec ce code JIRA existe déjà.');
       return;
     }
+    if (newProjectStart && newProjectEnd && newProjectStart > newProjectEnd) {
+      setError('La date de début doit être antérieure ou égale à la date de fin.');
+      return;
+    }
 
-    onAddProject(newProjectName.trim(), selectedColor, cleanJira || undefined);
+    onAddProject(
+      newProjectName.trim(), 
+      selectedColor, 
+      cleanJira || undefined, 
+      newProjectStart || undefined, 
+      newProjectEnd || undefined
+    );
     setNewProjectName('');
     setNewProjectJira('');
+    setNewProjectStart('');
+    setNewProjectEnd('');
     setError('');
   };
 
@@ -82,6 +99,8 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
     setEditName(proj.nom);
     setEditJiraKey(proj.jiraKey || '');
     setEditColor(proj.couleur);
+    setEditStart(proj.startDate || '');
+    setEditEnd(proj.endDate || '');
     setEditError('');
   };
 
@@ -99,8 +118,19 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
       setEditError('Un autre projet porte déjà ce code JIRA.');
       return;
     }
+    if (editStart && editEnd && editStart > editEnd) {
+      setEditError('La date de début doit être antérieure ou égale à la date de fin.');
+      return;
+    }
 
-    onUpdateProject(projectId, editName.trim(), editColor, cleanJira || undefined);
+    onUpdateProject(
+      projectId, 
+      editName.trim(), 
+      editColor, 
+      cleanJira || undefined, 
+      editStart || undefined, 
+      editEnd || undefined
+    );
     setEditingProjectId(null);
   };
 
@@ -187,6 +217,35 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                 />
               </div>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label htmlFor="new-project-start-input" className="block text-[10px] text-[#737873] mb-1">Date de début (optionnel) :</label>
+                <input
+                  id="new-project-start-input"
+                  type="date"
+                  value={newProjectStart}
+                  onChange={(e) => {
+                    setNewProjectStart(e.target.value);
+                    if (error) setError('');
+                  }}
+                  className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3.5 py-2 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
+                />
+              </div>
+              <div>
+                <label htmlFor="new-project-end-input" className="block text-[10px] text-[#737873] mb-1">Date de fin (optionnel) :</label>
+                <input
+                  id="new-project-end-input"
+                  type="date"
+                  value={newProjectEnd}
+                  onChange={(e) => {
+                    setNewProjectEnd(e.target.value);
+                    if (error) setError('');
+                  }}
+                  className="w-full rounded-xl border border-[#F0EFEB] bg-white px-3.5 py-2 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-colors"
+                />
+              </div>
+            </div>
             {error && <p className="text-xs text-rose-600 font-light">{error}</p>}
 
             <div>
@@ -261,6 +320,27 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                         </div>
                       </div>
 
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-[9px] text-[#737873]">Date de début</label>
+                          <input
+                            type="date"
+                            value={editStart}
+                            onChange={(e) => setEditStart(e.target.value)}
+                            className="w-full rounded-lg border border-[#F0EFEB] bg-white px-2 py-1 text-xs text-[#1A1D1A] focus:outline-hidden focus:border-[#6B8E78]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] text-[#737873]">Date de fin</label>
+                          <input
+                            type="date"
+                            value={editEnd}
+                            onChange={(e) => setEditEnd(e.target.value)}
+                            className="w-full rounded-lg border border-[#F0EFEB] bg-white px-2 py-1 text-xs text-[#1A1D1A] focus:outline-hidden focus:border-[#6B8E78]"
+                          />
+                        </div>
+                      </div>
+
                       {/* Sélecteur de couleur en édition */}
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -302,67 +382,99 @@ export const ProjectManagerModal: React.FC<ProjectManagerModalProps> = ({
                   );
                 }
 
+                const projectTasks = tasks.filter((t) => t.projetId === proj.id);
+                const metrics = calculateProjectMetrics(proj, projectTasks);
+
                 return (
                   <div
                     key={proj.id}
                     id={`project-item-${proj.id}`}
-                    className="flex items-center justify-between rounded-xl border border-[#F0EFEB] bg-white p-3 hover:border-[#E2DFD8] transition-colors"
+                    className="flex flex-col gap-2 rounded-xl border border-[#F0EFEB] bg-white p-3 hover:border-[#E2DFD8] transition-colors"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full"
-                        style={{ backgroundColor: proj.couleur }}
-                      />
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-[#1A1D1A] truncate flex items-center gap-1.5">
-                          <span>{proj.nom}</span>
-                          {proj.jiraKey && (
-                            <span className="rounded bg-indigo-50 text-indigo-700 px-1 py-0.5 text-[9px] font-mono">
-                              {proj.jiraKey}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-full"
+                          style={{ backgroundColor: proj.couleur }}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-[#1A1D1A] truncate flex items-center gap-1.5">
+                            <span>{proj.nom}</span>
+                            {proj.jiraKey && (
+                              <span className="rounded bg-indigo-50 text-indigo-700 px-1 py-0.5 text-[9px] font-mono">
+                                {proj.jiraKey}
+                              </span>
+                            )}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                            <span className="text-[11px] text-[#737873]">
+                              {count} tâche{count > 1 ? 's' : ''} associée{count > 1 ? 's' : ''}
                             </span>
-                          )}
-                        </p>
-                        <p className="text-[11px] text-[#737873]">
-                          {count} tâche{count > 1 ? 's' : ''} associée{count > 1 ? 's' : ''}
-                        </p>
+                            {proj.startDate && proj.endDate && (
+                              <span className="inline-flex items-center gap-1 rounded bg-[#FAF9F6] border border-[#F0EFEB] px-1.5 py-0.5 text-[9px] font-semibold text-[#5D7C68]">
+                                Temps : {metrics.timeProgressPercent}% | Tâches : {metrics.tasksProgressPercent}%
+                              </span>
+                            )}
+                            {metrics.isOverdue && (
+                              <span className="inline-flex items-center gap-1 rounded bg-rose-50 border border-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-600">
+                                Échéance dépassée
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        {onOpenProjectDetail && (
+                          <button
+                            id={`detail-project-btn-${proj.id}`}
+                            type="button"
+                            onClick={() => {
+                              onClose();
+                              onOpenProjectDetail(proj);
+                            }}
+                            className="flex items-center gap-1.5 rounded-lg border border-[#6B8E78]/20 bg-[#6B8E78]/5 px-2.5 py-1 text-[11px] font-medium text-[#5D7C68] hover:bg-[#6B8E78]/15 hover:border-[#6B8E78]/40 transition-colors cursor-pointer"
+                            title="Fiche détaillée, Livrables & Liens utiles"
+                          >
+                            <Eye className="h-3 w-3" />
+                            <span>Détails</span>
+                          </button>
+                        )}
+                        <button
+                          id={`edit-project-btn-${proj.id}`}
+                          type="button"
+                          onClick={() => startEdit(proj)}
+                          className="rounded-lg p-1.5 text-[#737873] hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                          title="Modifier ce projet"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          id={`delete-project-btn-${proj.id}`}
+                          type="button"
+                          onClick={() => onRequestDeleteProject(proj)}
+                          className="rounded-lg p-1.5 text-[#737873] hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                          title="Supprimer ce projet"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
-                      {onOpenProjectDetail && (
-                        <button
-                          id={`detail-project-btn-${proj.id}`}
-                          type="button"
-                          onClick={() => {
-                            onClose();
-                            onOpenProjectDetail(proj);
-                          }}
-                          className="flex items-center gap-1.5 rounded-lg border border-[#6B8E78]/20 bg-[#6B8E78]/5 px-2.5 py-1 text-[11px] font-medium text-[#5D7C68] hover:bg-[#6B8E78]/15 hover:border-[#6B8E78]/40 transition-colors cursor-pointer"
-                          title="Fiche détaillée, Livrables & Liens utiles"
-                        >
-                          <Eye className="h-3 w-3" />
-                          <span>Détails</span>
-                        </button>
-                      )}
-                      <button
-                        id={`edit-project-btn-${proj.id}`}
-                        type="button"
-                        onClick={() => startEdit(proj)}
-                        className="rounded-lg p-1.5 text-[#737873] hover:bg-slate-50 hover:text-slate-800 transition-colors"
-                        title="Modifier ce projet"
-                      >
-                        <Edit2 className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        id={`delete-project-btn-${proj.id}`}
-                        type="button"
-                        onClick={() => onRequestDeleteProject(proj)}
-                        className="rounded-lg p-1.5 text-[#737873] hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                        title="Supprimer ce projet"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                    {proj.startDate && proj.endDate && (
+                      <div className="w-full space-y-0.5">
+                        <div className="flex items-center justify-between text-[9px] text-[#737873] px-0.5">
+                          <span>Début : {new Date(proj.startDate).toLocaleDateString('fr-FR')}</span>
+                          <span>Fin : {new Date(proj.endDate).toLocaleDateString('fr-FR')}</span>
+                        </div>
+                        <div className="h-1.5 w-full rounded-full bg-[#FAF9F6] border border-[#F0EFEB] overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-[#6B8E78] transition-all"
+                            style={{ width: `${metrics.timeProgressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );
               })}

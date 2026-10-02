@@ -88,6 +88,8 @@ export interface Projet {
   raidLog?: RaidItem[];
   hasCapacityPlanning?: boolean;
   requiresTimesheet?: boolean;
+  startDate?: string; // Date de début (YYYY-MM-DD)
+  endDate?: string;   // Date de fin (YYYY-MM-DD)
 }
 
 export interface AppDataExport {
@@ -124,6 +126,7 @@ export interface Milestone {
   date: string; // ISO String (YYYY-MM-DD)
   description?: string;
   completed?: boolean;
+  isBoundary?: 'start' | 'end' | null; // Flag pour identifier les jalons de bornage automatique
 }
 
 

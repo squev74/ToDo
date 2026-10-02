@@ -108,9 +108,10 @@ import { TimesheetReportModal } from './components/TimesheetReportModal';
 import { TimeEntry } from './types/timesheet';
 import { fetchMonthTimeEntries, saveTimeEntry, fetchAllTimeEntries, fetchTimeEntry } from './services/timesheetService';
 import { PmoCopilotWidget } from './components/PmoCopilotWidget';
-import { generateGlobalAlerts } from './utils/pmoHealthCheck';
+import { generateGlobalAlerts, getLastWorkingDay } from './utils/pmoHealthCheck';
 import { GlobalPmoAttentionWidget } from './components/GlobalPmoAttentionWidget';
 import { ProjectHealthCheckBadge } from './components/ProjectHealthCheckBadge';
+import { syncBoundaryMilestones } from './utils/projectMetrics';
 
 export default function App() {
   const { user, loading: authLoading, logout, isAdmin, isApproved, userProfile } = useAuth();
@@ -674,7 +675,7 @@ export default function App() {
       });
   }, [user, isApproved]);
 
-  // Chargement automatique des imputations du mois courant pour le Health Check
+  // Chargement automatique des imputations du mois courant et du dernier jour ouvré pour le Health Check
   const [currentMonthEntries, setCurrentMonthEntries] = useState<TimeEntry[]>([]);
 
   useEffect(() => {
@@ -682,14 +683,45 @@ export default function App() {
       setCurrentMonthEntries([]);
       return;
     }
-    const d = new Date();
-    fetchMonthTimeEntries(user.uid, activeSpaceId, d.getFullYear(), d.getMonth() + 1)
-      .then((entries) => {
-        setCurrentMonthEntries(entries);
-      })
-      .catch((err) => {
-        console.error('Erreur de chargement des imputations pour le Health Check:', err);
-      });
+    const today = new Date();
+    const currYear = today.getFullYear();
+    const currMonth = today.getMonth() + 1;
+
+    const lastWDStr = getLastWorkingDay(today);
+    const lastWDParts = lastWDStr.split('-');
+    const lwdYear = parseInt(lastWDParts[0], 10);
+    const lwdMonth = parseInt(lastWDParts[1], 10);
+
+    const fetchCurrent = fetchMonthTimeEntries(user.uid, activeSpaceId, currYear, currMonth);
+
+    if (currYear === lwdYear && currMonth === lwdMonth) {
+      fetchCurrent
+        .then((entries) => {
+          setCurrentMonthEntries(entries);
+        })
+        .catch((err) => {
+          console.error('Erreur de chargement des imputations pour le Health Check:', err);
+        });
+    } else {
+      const fetchLastWD = fetchMonthTimeEntries(user.uid, activeSpaceId, lwdYear, lwdMonth);
+      Promise.all([fetchCurrent, fetchLastWD])
+        .then(([currEntries, lwdEntries]) => {
+          const seenIds = new Set<string>();
+          const merged: TimeEntry[] = [];
+          
+          [...currEntries, ...lwdEntries].forEach((entry) => {
+            if (!seenIds.has(entry.id)) {
+              seenIds.add(entry.id);
+              merged.push(entry);
+            }
+          });
+          
+          setCurrentMonthEntries(merged);
+        })
+        .catch((err) => {
+          console.error('Erreur de chargement des imputations des deux mois pour le Health Check:', err);
+        });
+    }
   }, [user, isApproved, activeSpaceId]);
 
   // Sauvegardes miroir dans le localStorage
@@ -1541,7 +1573,15 @@ export default function App() {
   };
 
   // Projets : Ajout dans l'espace actif
-  const handleAddProject = (nom: string, couleur: string, jiraKey?: string, hasCapacityPlanning = true, requiresTimesheet = true) => {
+  const handleAddProject = (
+    nom: string, 
+    couleur: string, 
+    jiraKey?: string, 
+    hasCapacityPlanning = true, 
+    requiresTimesheet = true,
+    startDate?: string,
+    endDate?: string
+  ) => {
     const newProj: Projet = {
       id: 'proj-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
       userId: user?.uid,
@@ -1552,6 +1592,8 @@ export default function App() {
       jiraKey,
       hasCapacityPlanning,
       requiresTimesheet,
+      startDate,
+      endDate,
     };
     setProjects((prev) => [...prev, newProj]);
 
@@ -1560,6 +1602,37 @@ export default function App() {
         console.error('Erreur Firestore projet:', err);
       });
     }
+
+    // Synchronisation automatique des jalons de bornage
+    setTimeout(() => {
+      setMilestones((latestMilestones) => {
+        let updatedMilestones = [...latestMilestones];
+        syncBoundaryMilestones(
+          newProj,
+          updatedMilestones,
+          (m) => {
+            const exists = updatedMilestones.some((x) => x.id === m.id);
+            if (exists) {
+              updatedMilestones = updatedMilestones.map((x) => (x.id === m.id ? m : x));
+            } else {
+              updatedMilestones = [m, ...updatedMilestones];
+            }
+            if (user) saveUserMilestonesToStorage(user.uid, updatedMilestones);
+            if (user && !user.isLocalFallback) {
+              saveMilestoneToFirestore(user.uid, m).catch((err) => console.error(err));
+            }
+          },
+          (id) => {
+            updatedMilestones = updatedMilestones.filter((x) => x.id !== id);
+            if (user) saveUserMilestonesToStorage(user.uid, updatedMilestones);
+            if (user && !user.isLocalFallback) {
+              deleteMilestoneFromFirestore(user.uid, id).catch((err) => console.error(err));
+            }
+          }
+        );
+        return updatedMilestones;
+      });
+    }, 100);
 
     showToast(`Projet « ${nom} » créé dans « ${currentSpace.nom} ».`);
   };
@@ -1639,7 +1712,9 @@ export default function App() {
     allocations?: MonthlyAllocation[],
     raidLog?: RaidItem[],
     hasCapacityPlanning?: boolean,
-    requiresTimesheet?: boolean
+    requiresTimesheet?: boolean,
+    startDate?: string,
+    endDate?: string
   ) => {
     const updatedProj = projects.find((p) => p.id === projectId);
     if (!updatedProj) return;
@@ -1655,6 +1730,8 @@ export default function App() {
       raidLog: raidLog !== undefined ? raidLog : updatedProj.raidLog,
       hasCapacityPlanning: hasCapacityPlanning !== undefined ? hasCapacityPlanning : updatedProj.hasCapacityPlanning,
       requiresTimesheet: requiresTimesheet !== undefined ? requiresTimesheet : updatedProj.requiresTimesheet,
+      startDate: startDate !== undefined ? startDate : updatedProj.startDate,
+      endDate: endDate !== undefined ? endDate : updatedProj.endDate,
     };
 
     setProjects((prev) =>
@@ -1673,6 +1750,37 @@ export default function App() {
           : t
       )
     );
+
+    // Synchronisation automatique des jalons de bornage
+    setTimeout(() => {
+      setMilestones((latestMilestones) => {
+        let updatedMilestones = [...latestMilestones];
+        syncBoundaryMilestones(
+          newProj,
+          updatedMilestones,
+          (m) => {
+            const exists = updatedMilestones.some((x) => x.id === m.id);
+            if (exists) {
+              updatedMilestones = updatedMilestones.map((x) => (x.id === m.id ? m : x));
+            } else {
+              updatedMilestones = [m, ...updatedMilestones];
+            }
+            if (user) saveUserMilestonesToStorage(user.uid, updatedMilestones);
+            if (user && !user.isLocalFallback) {
+              saveMilestoneToFirestore(user.uid, m).catch((err) => console.error(err));
+            }
+          },
+          (id) => {
+            updatedMilestones = updatedMilestones.filter((x) => x.id !== id);
+            if (user) saveUserMilestonesToStorage(user.uid, updatedMilestones);
+            if (user && !user.isLocalFallback) {
+              deleteMilestoneFromFirestore(user.uid, id).catch((err) => console.error(err));
+            }
+          }
+        );
+        return updatedMilestones;
+      });
+    }, 100);
 
     if (user && !user.isLocalFallback) {
       saveProjectToFirestore(user.uid, newProj).catch((err) => {
@@ -2285,8 +2393,8 @@ export default function App() {
         projects={currentSpaceProjects}
         tasks={currentSpaceTasks}
         activeSpace={currentSpace}
-        onAddProject={handleAddProject}
-        onUpdateProject={handleUpdateProject}
+        onAddProject={(nom, couleur, jiraKey, start, end) => handleAddProject(nom, couleur, jiraKey, true, true, start, end)}
+        onUpdateProject={(id, nom, couleur, jiraKey, start, end) => handleUpdateProject(id, nom, couleur, jiraKey, undefined, undefined, undefined, undefined, undefined, undefined, start, end)}
         onRequestDeleteProject={handleRequestDeleteProject}
         onClose={() => setIsProjectModalOpen(false)}
         onOpenProjectDetail={(proj) => setSelectedProjectDetail(proj)}

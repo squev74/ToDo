@@ -20,6 +20,7 @@ import {
   Pencil
 } from 'lucide-react';
 import { Projet, Tache, ProjectDeliverable, TeamMember, MonthlyAllocation, RaidItem, Milestone, ProjectPhase } from '../types';
+import { calculateProjectMetrics } from '../utils/projectMetrics';
 import { ProjectDeliverablesSection } from './ProjectDeliverablesSection';
 import { ProjectMonthlyCapacity } from './ProjectMonthlyCapacity';
 import { ProjectRaidLogSection } from './ProjectRaidLogSection';
@@ -42,7 +43,9 @@ interface ProjectDetailViewProps {
     allocations?: MonthlyAllocation[],
     raidLog?: RaidItem[],
     hasCapacityPlanning?: boolean,
-    requiresTimesheet?: boolean
+    requiresTimesheet?: boolean,
+    startDate?: string,
+    endDate?: string
   ) => void;
   onSaveMilestone: (milestone: Milestone) => void;
   onDeleteMilestone: (milestoneId: string) => void;
@@ -435,6 +438,72 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                 </div>
               </div>
 
+              {/* Période de validité du projet */}
+              <div className="rounded-2xl border border-[#F0EFEB] bg-white p-4 space-y-4 shadow-xs">
+                <div className="flex items-center gap-1.5 pb-2 border-b border-[#F0EFEB]">
+                  <Calendar className="h-4 w-4 text-[#5D7C68]" />
+                  <h3 className="text-xs font-bold text-[#1A1D1A]">Dates de bornage du projet</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label htmlFor="project-start-date-input" className="block text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                      Date de début
+                    </label>
+                    <input
+                      id="project-start-date-input"
+                      type="date"
+                      value={project.startDate || ''}
+                      onChange={(e) => {
+                        const val = e.target.value || undefined;
+                        onUpdateProject(
+                          project.id,
+                          project.nom,
+                          project.couleur,
+                          project.jiraKey,
+                          project.deliverables,
+                          project.teamMembers,
+                          project.allocations,
+                          project.raidLog,
+                          project.hasCapacityPlanning !== false,
+                          project.requiresTimesheet !== false,
+                          val,
+                          project.endDate
+                        );
+                      }}
+                      className="w-full rounded-xl border border-[#F0EFEB] bg-[#FAF9F6] px-3.5 py-2 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label htmlFor="project-end-date-input" className="block text-[10px] uppercase tracking-wider font-bold text-[#737873]">
+                      Date de fin
+                    </label>
+                    <input
+                      id="project-end-date-input"
+                      type="date"
+                      value={project.endDate || ''}
+                      onChange={(e) => {
+                        const val = e.target.value || undefined;
+                        onUpdateProject(
+                          project.id,
+                          project.nom,
+                          project.couleur,
+                          project.jiraKey,
+                          project.deliverables,
+                          project.teamMembers,
+                          project.allocations,
+                          project.raidLog,
+                          project.hasCapacityPlanning !== false,
+                          project.requiresTimesheet !== false,
+                          project.startDate,
+                          val
+                        );
+                      }}
+                      className="w-full rounded-xl border border-[#F0EFEB] bg-[#FAF9F6] px-3.5 py-2 text-xs text-[#1A1D1A] focus:border-[#6B8E78] focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-[#6B8E78]/10 transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Carte de Progression */}
               <div className="rounded-2xl border border-[#F0EFEB] bg-white p-4 space-y-3.5">
                 <div className="flex items-center justify-between">
@@ -671,6 +740,8 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
               });
             };
 
+            const metrics = project ? calculateProjectMetrics(project, projectTasks) : { timeProgressPercent: 0, tasksProgressPercent: 0, isOverdue: false };
+
             return (
               <div className="space-y-6">
                 {/* 1. CHRONOGRAMME SVG AVEC JALONS OVERLAY */}
@@ -695,6 +766,33 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                       </div>
                     </div>
                   </div>
+
+                  {project && project.startDate && project.endDate && (
+                    <div className="bg-[#FAF9F6] border border-[#F0EFEB] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-in fade-in duration-200">
+                      <div className="space-y-1.5 flex-1 max-w-md">
+                        <div className="flex items-center justify-between font-semibold text-[#1A1D1A]">
+                          <span>Temps Écoulé</span>
+                          <span>{metrics.timeProgressPercent}%</span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-white border border-[#F0EFEB] overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-[#6B8E78] transition-all duration-300"
+                            style={{ width: `${metrics.timeProgressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-[#F0EFEB] px-2.5 py-1 font-semibold text-[#5D7C68] shadow-2xs">
+                          Temps : {metrics.timeProgressPercent}% | Tâches Réalisées : {metrics.tasksProgressPercent}%
+                        </span>
+                        {metrics.isOverdue && (
+                          <span className="inline-flex items-center gap-1 rounded bg-rose-100 border border-rose-200 px-2.5 py-1 font-bold text-rose-700 animate-pulse">
+                            ⚠️ Échéance dépassée
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Zone de l'image SVG interactive */}
                   <div className="overflow-x-auto custom-scrollbar">

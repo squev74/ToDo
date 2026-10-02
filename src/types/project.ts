@@ -39,6 +39,8 @@ export interface Projet {
   raidLog?: RaidItem[];
   hasCapacityPlanning?: boolean;
   requiresTimesheet?: boolean;
+  startDate?: string; // Date de début (YYYY-MM-DD)
+  endDate?: string;   // Date de fin (YYYY-MM-DD)
 }
 
 export type Project = Projet;
