@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Plus,
   Search,
@@ -388,13 +388,55 @@ export default function App() {
   });
   const [timesheetEntriesForReport, setTimesheetEntriesForReport] = useState<TimeEntry[]>([]);
   const [allTimesheets, setAllTimesheets] = useState<TimeEntry[]>([]);
+  const [currentMonthEntries, setCurrentMonthEntries] = useState<TimeEntry[]>([]);
 
-  // Charger toutes les imputations pour les besoins du reporting / dashboard
-  useEffect(() => {
-    if (!user) {
+  // Callback unifié pour rafraîchir l'intégralité des saisies de temps
+  const refreshTimesheetData = useCallback(() => {
+    if (!user || !isApproved || user.isLocalFallback) {
+      setCurrentMonthEntries([]);
       setAllTimesheets([]);
       return;
     }
+    const today = new Date();
+    const currYear = today.getFullYear();
+    const currMonth = today.getMonth() + 1;
+
+    const lastWDStr = getLastWorkingDay(today);
+    const lastWDParts = lastWDStr.split('-');
+    const lwdYear = parseInt(lastWDParts[0], 10);
+    const lwdMonth = parseInt(lastWDParts[1], 10);
+
+    const fetchCurrent = fetchMonthTimeEntries(user.uid, activeSpaceId, currYear, currMonth);
+
+    if (currYear === lwdYear && currMonth === lwdMonth) {
+      fetchCurrent
+        .then((entries) => {
+          setCurrentMonthEntries(entries);
+        })
+        .catch((err) => {
+          console.error('Erreur de chargement des imputations pour le Health Check:', err);
+        });
+    } else {
+      const fetchLastWD = fetchMonthTimeEntries(user.uid, activeSpaceId, lwdYear, lwdMonth);
+      Promise.all([fetchCurrent, fetchLastWD])
+        .then(([currEntries, lwdEntries]) => {
+          const seenIds = new Set<string>();
+          const merged: TimeEntry[] = [];
+          
+          [...currEntries, ...lwdEntries].forEach((entry) => {
+            if (!seenIds.has(entry.id)) {
+              seenIds.add(entry.id);
+              merged.push(entry);
+            }
+          });
+          
+          setCurrentMonthEntries(merged);
+        })
+        .catch((err) => {
+          console.error('Erreur de chargement des imputations des deux mois pour le Health Check:', err);
+        });
+    }
+
     fetchAllTimeEntries(user.uid, activeSpaceId)
       .then((data) => {
         setAllTimesheets(data);
@@ -402,7 +444,12 @@ export default function App() {
       .catch((err) => {
         console.error('Erreur de chargement de toutes les imputations pour analytics:', err);
       });
-  }, [user, activeSpaceId, currentView]);
+  }, [user, isApproved, activeSpaceId]);
+
+  // Charger toutes les imputations au démarrage, changement de vue ou de workspace
+  useEffect(() => {
+    refreshTimesheetData();
+  }, [refreshTimesheetData, currentView]);
 
   // Récupérer le nom d'intervenant pour la feuille de temps et le reporting de manière réactive
   const [timesheetUserName, setTimesheetUserName] = useState<string>(() => {
@@ -468,6 +515,7 @@ export default function App() {
         comment: finalComment,
       });
 
+      refreshTimesheetData();
       showToast(`+${hours}h ajoutées sur ${projectName} pour aujourd'hui (Total: ${totalHours}h) !`);
     } catch (err) {
       console.error('Erreur QuickLogTime:', err);
@@ -674,55 +722,6 @@ export default function App() {
         console.error('Erreur chargement logs d\'activité:', err);
       });
   }, [user, isApproved]);
-
-  // Chargement automatique des imputations du mois courant et du dernier jour ouvré pour le Health Check
-  const [currentMonthEntries, setCurrentMonthEntries] = useState<TimeEntry[]>([]);
-
-  useEffect(() => {
-    if (!user || !isApproved || user.isLocalFallback) {
-      setCurrentMonthEntries([]);
-      return;
-    }
-    const today = new Date();
-    const currYear = today.getFullYear();
-    const currMonth = today.getMonth() + 1;
-
-    const lastWDStr = getLastWorkingDay(today);
-    const lastWDParts = lastWDStr.split('-');
-    const lwdYear = parseInt(lastWDParts[0], 10);
-    const lwdMonth = parseInt(lastWDParts[1], 10);
-
-    const fetchCurrent = fetchMonthTimeEntries(user.uid, activeSpaceId, currYear, currMonth);
-
-    if (currYear === lwdYear && currMonth === lwdMonth) {
-      fetchCurrent
-        .then((entries) => {
-          setCurrentMonthEntries(entries);
-        })
-        .catch((err) => {
-          console.error('Erreur de chargement des imputations pour le Health Check:', err);
-        });
-    } else {
-      const fetchLastWD = fetchMonthTimeEntries(user.uid, activeSpaceId, lwdYear, lwdMonth);
-      Promise.all([fetchCurrent, fetchLastWD])
-        .then(([currEntries, lwdEntries]) => {
-          const seenIds = new Set<string>();
-          const merged: TimeEntry[] = [];
-          
-          [...currEntries, ...lwdEntries].forEach((entry) => {
-            if (!seenIds.has(entry.id)) {
-              seenIds.add(entry.id);
-              merged.push(entry);
-            }
-          });
-          
-          setCurrentMonthEntries(merged);
-        })
-        .catch((err) => {
-          console.error('Erreur de chargement des imputations des deux mois pour le Health Check:', err);
-        });
-    }
-  }, [user, isApproved, activeSpaceId]);
 
   // Sauvegardes miroir dans le localStorage
   useEffect(() => {
@@ -2295,6 +2294,7 @@ export default function App() {
             onOpenReportModal={handleOpenTimesheetReport}
             userName={timesheetUserName}
             onUserNameChange={setTimesheetUserName}
+            onEntriesChanged={refreshTimesheetData}
           />
         ) : currentView === 'knowledge' ? (
           <KnowledgeBaseView activeSpaceId={currentSpace.id} />

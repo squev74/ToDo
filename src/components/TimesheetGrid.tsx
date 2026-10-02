@@ -39,6 +39,7 @@ interface TimesheetGridProps {
   onOpenReportModal: (year: number, month: number) => void;
   userName?: string; // Nom de l'intervenant (ex: "Sylvain")
   onUserNameChange?: (name: string) => void; // Callback pour synchroniser le nom
+  onEntriesChanged?: () => void; // Callback pour notifier les changements d'imputation
 }
 
 const MONTHS_FR = [
@@ -56,6 +57,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
   onOpenReportModal,
   userName = 'Sylvain',
   onUserNameChange,
+  onEntriesChanged,
 }) => {
   const [currentYear, setCurrentYear] = useState<number>(() => new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState<number>(() => new Date().getMonth() + 1); // 1-12
@@ -468,6 +470,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
         };
         return [...filtered, newEntry];
       });
+      onEntriesChanged?.();
     } catch (err) {
       console.error(err);
       setError('Erreur lors de la sauvegarde de la cellule.');
@@ -529,6 +532,7 @@ export const TimesheetGrid: React.FC<TimesheetGridProps> = ({
         };
         return [...filtered, newEntry];
       });
+      onEntriesChanged?.();
     } catch (err) {
       console.error(err);
       setError('Erreur lors de l’enregistrement du commentaire.');
