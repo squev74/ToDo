@@ -82,6 +82,7 @@ import { ProjectDetailView } from './components/ProjectDetailView';
 import { ConfirmationModal } from './components/ConfirmationModal';
 import { DailyReportPanel } from './components/DailyReportPanel';
 import { ActivityReportModal } from './components/ActivityReportModal';
+import { ActivityReportView } from './views/ActivityReportView';
 import { WelcomeBanner } from './components/WelcomeBanner';
 import { WorkspaceSelector } from './components/WorkspaceSelector';
 import { WorkspaceManagerModal } from './components/WorkspaceManagerModal';
@@ -2315,6 +2316,16 @@ export default function App() {
             onNavigateToTab={setCurrentView}
             userName={timesheetUserName}
           />
+        ) : currentView === 'report' ? (
+          <ActivityReportView
+            tasks={tasks}
+            projects={projects}
+            activeSpace={currentSpace}
+            initialStartDate={activityReportDates.start}
+            initialEndDate={activityReportDates.end}
+            activityLogs={activityLogs}
+            onClose={() => setCurrentView('tasks')}
+          />
         ) : (
           /* PANNEAU DAILY REPORT DE L'ESPACE ACTIF (Exclut le Backlog) */
           <DailyReportPanel
@@ -2462,6 +2473,7 @@ export default function App() {
         activeSpace={currentSpace}
         initialStartDate={activityReportDates.start}
         initialEndDate={activityReportDates.end}
+        activityLogs={activityLogs}
       />
 
       {/* MODALE COMPTE-RENDU MENSUEL TIMESHEET AVEC IA (GEMINI FLASH) */}
