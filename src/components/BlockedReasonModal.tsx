@@ -60,7 +60,7 @@ export const BlockedReasonModal: React.FC<BlockedReasonModalProps> = ({
           </div>
           <div>
             <h3 id="blocked-modal-title" className="text-base font-normal tracking-wide text-[#1A1D1A]">
-              Justifier le statut « Bloqué »
+              Justifier le statut « En attente »
             </h3>
             <p className="mt-1 text-xs text-[#737873]">
               Tâche concernée : <span className="font-medium text-[#1A1D1A]">{task.titre}</span>
@@ -71,7 +71,7 @@ export const BlockedReasonModal: React.FC<BlockedReasonModalProps> = ({
         <div className="mt-4 rounded-xl bg-[#C89B7B]/10 border border-[#C89B7B]/25 p-3 flex items-start gap-2.5 text-xs text-[#966847]">
           <Info className="h-4 w-4 shrink-0 text-[#966847] mt-0.5" />
           <p>
-            Règle : Pour assurer le suivi serein de l&apos;équipe, veuillez renseigner le motif explicatif du blocage.
+            Règle : Pour assurer le suivi serein de l&apos;équipe, veuillez renseigner le motif explicatif de la mise en attente.
           </p>
         </div>
 
@@ -81,7 +81,7 @@ export const BlockedReasonModal: React.FC<BlockedReasonModalProps> = ({
               htmlFor="blocked-reason-textarea"
               className="block text-xs font-medium text-[#737873] mb-1.5"
             >
-              Motif explicatif du blocage <span className="text-rose-500">*</span>
+              Motif explicatif de la mise en attente <span className="text-rose-500">*</span>
             </label>
             <textarea
               id="blocked-reason-textarea"
@@ -103,7 +103,7 @@ export const BlockedReasonModal: React.FC<BlockedReasonModalProps> = ({
             />
             {attemptedSubmit && isTextEmpty && (
               <p id="blocked-reason-error" className="mt-1.5 text-xs font-normal text-rose-600">
-                Le commentaire est obligatoire pour passer la tâche en statut Bloqué.
+                Le commentaire est obligatoire pour passer la tâche en statut En attente.
               </p>
             )}
           </div>
@@ -128,7 +128,7 @@ export const BlockedReasonModal: React.FC<BlockedReasonModalProps> = ({
                   : 'bg-[#C89B7B] hover:bg-[#b58765] text-white'
               }`}
             >
-              Confirmer le blocage
+              Confirmer la mise en attente
             </button>
           </div>
         </form>

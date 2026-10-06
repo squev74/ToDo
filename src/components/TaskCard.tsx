@@ -81,7 +81,7 @@ export const VIBRANT_STATUS_CONFIG: Record<
     dot: 'bg-amber-950',
   },
   Blocked: {
-    label: 'Bloqué',
+    label: 'En attente',
     bg: 'bg-red-500',
     text: 'text-white font-bold',
     border: 'border-red-600',
@@ -351,7 +351,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                   <option value="Backlog" className="bg-white text-purple-700 font-semibold">Backlog</option>
                   <option value="Open" className="bg-white text-sky-600 font-medium">À Faire</option>
                   <option value="In Progress" className="bg-white text-amber-900 font-semibold">En Cours</option>
-                  <option value="Blocked" className="bg-white text-red-600 font-bold">Bloqué</option>
+                  <option value="Blocked" className="bg-white text-red-600 font-bold">En attente</option>
                   <option value="Done" className="bg-white text-emerald-600 font-medium">Terminé</option>
                   <option value="Cancelled" className="bg-white text-rose-600 font-medium">Annulé</option>
                 </select>

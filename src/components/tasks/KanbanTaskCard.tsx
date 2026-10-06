@@ -158,10 +158,10 @@ export const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
           {task.statut === 'Blocked' && (
             <div 
               className="inline-flex items-center gap-1 rounded bg-rose-50 border border-rose-100 px-1.5 py-0.5 text-[9px] text-rose-700 font-medium cursor-help"
-              title={task.commentaires?.find(c => c.texte.startsWith('Bloqué'))?.texte || 'Tâche bloquée sans motif'}
+              title={task.commentaires?.find(c => c.texte.startsWith('Bloqué') || c.texte.startsWith('En attente'))?.texte || 'Tâche en attente sans motif'}
             >
               <AlertCircle className="h-2.5 w-2.5 text-rose-500" />
-              <span>Sujet Bloqué</span>
+              <span>Sujet En attente</span>
             </div>
           )}
 

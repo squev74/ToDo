@@ -243,7 +243,7 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     }
 
     if (statut === 'Blocked' && initialTask?.statut !== 'Blocked' && !blockedReason.trim()) {
-      setError('Un motif explicatif est obligatoire pour définir le statut sur Bloqué.');
+      setError('Un motif explicatif est obligatoire pour définir le statut sur En attente.');
       return;
     }
 
@@ -408,9 +408,9 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 >
                   <option value="Open">À faire (Open)</option>
                   <option value="In Progress">En cours (In Progress)</option>
-                  <option value="Blocked">Bloqué (Blocked)</option>
+                  <option value="Blocked">En attente (Blocked)</option>
                   <option value="Done">Terminé (Done)</option>
-                  <option value="Backlog">Backlog (En attente)</option>
+                  <option value="Backlog">Backlog</option>
                 </select>
               </div>
             </div>

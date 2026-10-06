@@ -58,7 +58,7 @@ export function formatLastActivityDate(isoString?: string | null): string {
 export function isTaskExcludedFromInactivity(statut: StatutTache | string): boolean {
   if (!statut) return true;
   const s = statut.toLowerCase().trim();
-  return s === 'backlog' || s === 'done';
+  return s === 'backlog' || s === 'done' || s === 'cancelled';
 }
 
 /**

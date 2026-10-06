@@ -60,7 +60,7 @@ const STATUS_LABELS: Record<string, string> = {
   Backlog: 'Backlog',
   Open: 'À ouvrir',
   'In Progress': 'En cours',
-  Blocked: 'Bloqué',
+  Blocked: 'En attente',
   Done: 'Terminé',
 };
 
@@ -532,7 +532,7 @@ export const ProjectDetailView: React.FC<ProjectDetailViewProps> = ({
                     <span className="text-xs font-medium text-blue-600">{taskStats.active}</span>
                   </div>
                   <div>
-                    <span className="block text-[10px] text-[#737873]">Bloquées</span>
+                    <span className="block text-[10px] text-[#737873]">En attente</span>
                     <span className="text-xs font-medium text-rose-600">{taskStats.blocked}</span>
                   </div>
                   <div>

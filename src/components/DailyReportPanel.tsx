@@ -611,7 +611,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
               <AlertOctagon className="h-4.5 w-4.5" />
             </div>
             <div>
-              <p className="text-xs font-medium text-[#966847]">Tâches bloquées</p>
+              <p className="text-xs font-medium text-[#966847]">Tâches en attente</p>
               <p className="text-lg font-medium text-[#966847]">
                 {blockedTasksInPeriod.length}
               </p>
@@ -761,7 +761,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
                 const project = task.projetId ? projectsMap.get(task.projetId) : undefined;
                 const lastBlockedComment = [...(task.commentaires || [])]
                   .reverse()
-                  .find((c) => c.texte.toLowerCase().includes('bloqué'))?.texte;
+                  .find((c) => c.texte.toLowerCase().includes('bloqué') || c.texte.toLowerCase().includes('attente'))?.texte;
 
                 return (
                   <div
@@ -774,7 +774,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
                         {task.titre}
                       </h4>
                       <span className="inline-flex items-center gap-1 rounded-md bg-red-500 text-white px-2 py-0.5 text-xs font-bold shrink-0 shadow-2xs">
-                        Bloqué
+                        En attente
                       </span>
                     </div>
 

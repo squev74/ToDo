@@ -63,7 +63,7 @@ export const STATUS_CONFIG: Record<
     icon: Clock,
   },
   Blocked: {
-    label: 'Bloqué',
+    label: 'En attente',
     bgClass: 'bg-red-500',
     textClass: 'text-white font-bold',
     borderClass: 'border-red-600',

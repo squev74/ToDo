@@ -46,7 +46,7 @@ const COLUMNS: ColumnConfig[] = [
   },
   {
     status: 'Blocked',
-    title: 'Bloqué',
+    title: 'En attente',
     icon: AlertCircle,
     colorClass: 'text-rose-700',
     borderClass: 'border-rose-100',

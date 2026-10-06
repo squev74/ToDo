@@ -617,7 +617,7 @@ Rédige le rapport maintenant.`;
                 <strong className="text-amber-600 font-semibold">{matchingTasks.filter(t => t.statut === 'in_progress').length}</strong>
               </div>
               <div className="flex justify-between">
-                <span>Bloquées (Status Blocked) :</span>
+                <span>En attente (Status Blocked) :</span>
                 <strong className="text-rose-600 font-semibold">{matchingTasks.filter(t => t.statut === 'blocked').length}</strong>
               </div>
             </div>

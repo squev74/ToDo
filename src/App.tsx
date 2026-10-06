@@ -1175,7 +1175,7 @@ export default function App() {
     } else if (newStatus === 'Cancelled') {
       showToast('Tâche marquée comme annulée.');
     } else if (newStatus === 'Blocked') {
-      showToast('Tâche marquée comme bloquée avec motif.');
+      showToast('Tâche marquée comme en attente avec motif.');
     } else if (newStatus === 'Backlog' || (newStatus as string) === 'backlog') {
       showToast('Tâche déplacée dans le Backlog.');
     } else if (newStatus === 'Open') {
@@ -1186,7 +1186,7 @@ export default function App() {
   // Validation du motif de blocage
   const handleConfirmBlockedReason = (reason: string) => {
     if (!blockedModalTask) return;
-    applyStatusChange(blockedModalTask.id, 'Blocked', `Bloqué : ${reason}`);
+    applyStatusChange(blockedModalTask.id, 'Blocked', `En attente : ${reason}`);
     setBlockedModalTask(null);
   };
 
@@ -1258,7 +1258,7 @@ export default function App() {
       if (taskData.blockedReason && taskData.statut === 'Blocked') {
         comments.push({
           id: 'comm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-          texte: `Bloqué : ${taskData.blockedReason}`,
+          texte: `En attente : ${taskData.blockedReason}`,
           date: new Date().toISOString(),
         });
       }
@@ -1351,7 +1351,7 @@ export default function App() {
       if (taskData.blockedReason && taskData.statut === 'Blocked') {
         comments.push({
           id: 'comm-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-          texte: `Bloqué : ${taskData.blockedReason}`,
+          texte: `En attente : ${taskData.blockedReason}`,
           date: new Date().toISOString(),
         });
       }
