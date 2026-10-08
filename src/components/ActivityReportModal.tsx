@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Sparkles } from 'lucide-react';
-import { Tache, Projet, Espace, ActivityLog } from '../types';
+import { Tache, Projet, Espace, ActivityLog, Milestone } from '../types';
 import { ActivityReportView } from '../views/ActivityReportView';
 
 export interface ActivityReportModalProps {
@@ -12,6 +12,7 @@ export interface ActivityReportModalProps {
   initialStartDate?: string;
   initialEndDate?: string;
   activityLogs?: ActivityLog[];
+  milestones?: Milestone[];
 }
 
 export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
@@ -23,6 +24,7 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
   initialStartDate,
   initialEndDate,
   activityLogs = [],
+  milestones,
 }) => {
   if (!isOpen) return null;
 
@@ -69,6 +71,7 @@ export const ActivityReportModal: React.FC<ActivityReportModalProps> = ({
             initialStartDate={initialStartDate}
             initialEndDate={initialEndDate}
             activityLogs={activityLogs}
+            milestones={milestones}
             onClose={onClose}
             isModalContext={true}
           />

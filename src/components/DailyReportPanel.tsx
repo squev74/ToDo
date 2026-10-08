@@ -379,9 +379,9 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
     }
 
     lines.push('');
-    lines.push(`⛔ TÂCHES BLOQUÉES (${blockedTasksInPeriod.length}) :`);
+    lines.push(`⛔ TÂCHES EN ATTENTE (${blockedTasksInPeriod.length}) :`);
     if (blockedTasksInPeriod.length === 0) {
-      lines.push('  • Aucune tâche bloquée sur cette période.');
+      lines.push('  • Aucune tâche en attente sur cette période.');
     } else {
       blockedTasksInPeriod.forEach((t) => {
         const pNom = t.projetId ? ` [${projectsMap.get(t.projetId)?.nom || ''}]` : '';
@@ -724,7 +724,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
           )}
         </div>
 
-        {/* Volet 2: Tâches bloquées ("Blocked") */}
+        {/* Volet 2: Tâches en attente ("Blocked") */}
         <div
           id="report-blocked-tasks-container"
           className="rounded-2xl border border-[#F0EFEB] bg-white p-5 shadow-[0_2px_10px_rgba(0,0,0,0.02)] flex flex-col"
@@ -733,7 +733,7 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
             <div className="flex items-center gap-2">
               <AlertOctagon className="h-4 w-4 text-[#C89B7B]" />
               <h3 className="text-sm font-medium text-[#1A1D1A]">
-                Tâches bloquées ({blockedTasksInPeriod.length})
+                Tâches en attente ({blockedTasksInPeriod.length})
               </h3>
             </div>
             <span className="text-[11px] font-medium text-[#737873]">
@@ -748,10 +748,10 @@ export const DailyReportPanel: React.FC<DailyReportPanelProps> = ({
             >
               <CheckCircle2 className="h-7 w-7 text-[#6B8E78]/50 mb-2" />
               <p className="text-xs font-medium text-[#1A1D1A]">
-                Aucune tâche bloquée sur cette période
+                Aucune tâche en attente sur cette période
               </p>
               <p className="text-[11px] text-[#737873] mt-1 max-w-xs font-light">
-                Aucun blocage n&apos;a été signalé entre le {formatFrenchDate(effectiveStart)} et le{' '}
+                Aucun point d&apos;attente n&apos;a été signalé entre le {formatFrenchDate(effectiveStart)} et le{' '}
                 {formatFrenchDate(effectiveEnd)}.
               </p>
             </div>

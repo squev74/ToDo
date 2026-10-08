@@ -4,7 +4,7 @@ import { TimeEntry } from '../types/timesheet';
 export interface PmoAlert {
   id: string;
   severity: 'critical' | 'warning' | 'info';
-  category: 'timesheet' | 'delay' | 'stagnant' | 'capacity' | 'raid' | 'deliverable';
+  category: 'timesheet' | 'delay' | 'stagnant' | 'capacity' | 'raid' | 'deliverable' | 'inbox';
   projectId?: string;
   projectCode?: string;
   message: string;
@@ -57,10 +57,34 @@ export function generateGlobalAlerts(
   projects: Projet[],
   tasks: Tache[],
   timesheets: TimeEntry[],
-  currentDateStr = new Date().toISOString().split('T')[0]
+  currentDateStr = new Date().toISOString().split('T')[0],
+  inboxEmailCount?: number
 ): PmoAlert[] {
   const alerts: PmoAlert[] = [];
   const now = new Date();
+
+  // ----------------------------------------------------
+  // 0. OBJECTIF 0 EMAIL (Triage Boîte Mail)
+  // ----------------------------------------------------
+  if (typeof inboxEmailCount === 'number') {
+    if (inboxEmailCount > 100) {
+      alerts.push({
+        id: `inbox-critical-${inboxEmailCount}`,
+        severity: 'critical',
+        category: 'inbox',
+        message: `Boîte mail saturée (${inboxEmailCount} e-mails > 100) : Risque élevé d'oubli d'actions prioritaires. Un traitement Inbox Zero est requis.`,
+        actionTab: 'report',
+      });
+    } else if (inboxEmailCount > 50) {
+      alerts.push({
+        id: `inbox-warning-${inboxEmailCount}`,
+        severity: 'warning',
+        category: 'inbox',
+        message: `Boîte mail chargée (${inboxEmailCount} e-mails > 50) : Seuil de vigilance dépassé, pensez à trier vos e-mails en attente.`,
+        actionTab: 'report',
+      });
+    }
+  }
 
   // ----------------------------------------------------
   // 1. SAISIE DES TEMPS (Timesheet)
@@ -101,7 +125,7 @@ export function generateGlobalAlerts(
 
     // 2. TÂCHES EN RETARD
     projTasks.forEach((task) => {
-      if (task.statut !== 'Done' && task.statut !== 'backlog' && task.statut !== 'Backlog' && task.dateEcheance) {
+      if (task.statut !== 'Done' && task.statut !== 'Cancelled' && task.statut !== 'backlog' && task.statut !== 'Backlog' && task.dateEcheance) {
         if (task.dateEcheance < currentDateStr) {
           const delayDays = getDaysDiff(currentDateStr, task.dateEcheance);
           alerts.push({

@@ -117,8 +117,9 @@ export function isTaskActiveInPeriod(task: Tache, dateDebut: string, dateFin: st
 export function normalizeTaskStatus(statut: string): string {
   const s = statut.toLowerCase().trim();
   if (s === 'done' || s === 'terminé' || s === 'termine') return 'done';
+  if (s === 'cancelled' || s === 'annulé' || s === 'annule') return 'cancelled';
   if (s === 'in progress' || s === 'in_progress' || s === 'en cours') return 'in_progress';
-  if (s === 'blocked' || s === 'bloqué' || s === 'bloque') return 'blocked';
+  if (s === 'blocked' || s === 'bloqué' || s === 'bloque' || s === 'en attente') return 'blocked';
   if (s === 'backlog') return 'backlog';
   return 'open';
 }

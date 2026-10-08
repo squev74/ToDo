@@ -111,6 +111,7 @@ import { fetchMonthTimeEntries, saveTimeEntry, fetchAllTimeEntries, fetchTimeEnt
 import { PmoCopilotWidget } from './components/PmoCopilotWidget';
 import { generateGlobalAlerts, getLastWorkingDay } from './utils/pmoHealthCheck';
 import { GlobalPmoAttentionWidget } from './components/GlobalPmoAttentionWidget';
+import { EmailInboxAlert } from './components/EmailInboxAlert';
 import { ProjectHealthCheckBadge } from './components/ProjectHealthCheckBadge';
 import { syncBoundaryMilestones } from './utils/projectMetrics';
 
@@ -780,10 +781,40 @@ export default function App() {
     return map;
   }, [currentSpaceProjects]);
 
+  // Compteur d'e-mails (Objectif 0 Email) pour l'espace actif
+  const [inboxEmailCount, setInboxEmailCount] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(`pmo_inbox_email_count_space_${activeSpaceId}`);
+      return saved !== null ? Math.max(0, parseInt(saved, 10) || 0) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`pmo_inbox_email_count_space_${currentSpace.id}`);
+      setInboxEmailCount(saved !== null ? Math.max(0, parseInt(saved, 10) || 0) : 0);
+    } catch {
+      setInboxEmailCount(0);
+    }
+  }, [currentSpace.id]);
+
+  useEffect(() => {
+    const handleInboxSync = (e: Event) => {
+      const customEvent = e as CustomEvent<{ spaceId: string; count: number }>;
+      if (customEvent.detail && customEvent.detail.spaceId === currentSpace.id) {
+        setInboxEmailCount(customEvent.detail.count);
+      }
+    };
+    window.addEventListener('pmo-inbox-updated', handleInboxSync);
+    return () => window.removeEventListener('pmo-inbox-updated', handleInboxSync);
+  }, [currentSpace.id]);
+
   // Alertes du Health Check PMO pour l'espace actif
   const healthCheckAlerts = useMemo(() => {
-    return generateGlobalAlerts(currentSpaceProjects, tasks, currentMonthEntries);
-  }, [currentSpaceProjects, tasks, currentMonthEntries]);
+    return generateGlobalAlerts(currentSpaceProjects, tasks, currentMonthEntries, undefined, inboxEmailCount);
+  }, [currentSpaceProjects, tasks, currentMonthEntries, inboxEmailCount]);
 
   // Modèles de tâches récurrentes de l'espace actif
   const currentSpaceRecurringTemplates = useMemo(() => {
@@ -2002,9 +2033,9 @@ export default function App() {
     return <AccessDenied onLogout={handleLogout} />;
   }
 
-  // Tâches en retard dans l'espace actif (exclut le Backlog)
+  // Tâches en retard dans l'espace actif (exclut le Backlog, Terminé et Annulé)
   const overdueCount = activeSpaceTasks.filter((t) => {
-    if (t.statut === 'Done') return false;
+    if (t.statut === 'Done' || t.statut === 'Cancelled') return false;
     if (!t.dateEcheance) return false;
     const today = new Date().toISOString().split('T')[0];
     return t.dateEcheance < today;
@@ -2141,6 +2172,13 @@ export default function App() {
                   setSelectedProjectDetail(proj);
                 }
               }}
+            />
+
+            {/* WIDGET OBJECTIF 0 EMAIL (ALERTE > 50 ET > 100 EMAILS) */}
+            <EmailInboxAlert
+              spaceId={currentSpace.id}
+              spaceName={currentSpace.nom}
+              onCountChange={setInboxEmailCount}
             />
 
             {/* COMMUTATEUR DE VUE (LISTE <-> KANBAN) & TITRE */}
@@ -2317,15 +2355,27 @@ export default function App() {
             userName={timesheetUserName}
           />
         ) : currentView === 'report' ? (
-          <ActivityReportView
-            tasks={tasks}
-            projects={projects}
-            activeSpace={currentSpace}
-            initialStartDate={activityReportDates.start}
-            initialEndDate={activityReportDates.end}
-            activityLogs={activityLogs}
-            onClose={() => setCurrentView('tasks')}
-          />
+          <div className="space-y-8">
+            <ActivityReportView
+              tasks={tasks}
+              projects={projects}
+              activeSpace={currentSpace}
+              initialStartDate={activityReportDates.start}
+              initialEndDate={activityReportDates.end}
+              activityLogs={activityLogs}
+              milestones={milestones}
+              onClose={() => setCurrentView('tasks')}
+            />
+            <div className="border-t border-[#EAE8E2] pt-6">
+              <DailyReportPanel
+                tasks={activeSpaceTasks}
+                projects={currentSpaceProjects}
+                activeSpace={currentSpace}
+                onOpenActivityReportModal={handleOpenActivityReportModal}
+                activityLogs={activityLogs}
+              />
+            </div>
+          </div>
         ) : (
           /* PANNEAU DAILY REPORT DE L'ESPACE ACTIF (Exclut le Backlog) */
           <DailyReportPanel
@@ -2474,6 +2524,7 @@ export default function App() {
         initialStartDate={activityReportDates.start}
         initialEndDate={activityReportDates.end}
         activityLogs={activityLogs}
+        milestones={milestones}
       />
 
       {/* MODALE COMPTE-RENDU MENSUEL TIMESHEET AVEC IA (GEMINI FLASH) */}

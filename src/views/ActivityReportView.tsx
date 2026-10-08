@@ -220,10 +220,10 @@ export const ActivityReportView: React.FC<ActivityReportViewProps> = ({
       ? completedTasks.map((t) => `- ${t.titre}${t.description ? ` (${t.description})` : ''}`).join('\n')
       : 'Aucune tâche terminée sur cette période.';
 
-    // 4. Tâches en cours / à faire
-    const remainingTasks = matchingTasks.filter((t) => t.statut !== 'done');
+    // 4. Tâches en cours / à faire (hors terminées et annulées)
+    const remainingTasks = matchingTasks.filter((t) => t.statut !== 'done' && t.statut !== 'cancelled');
     const formattedRemainingTasksList = remainingTasks.length > 0
-      ? remainingTasks.map((t) => `- ${t.titre} [Statut: ${t.statut}]`).join('\n')
+      ? remainingTasks.map((t) => `- ${t.titre} [Statut: ${t.statut === 'blocked' ? 'En attente' : t.statut}]`).join('\n')
       : 'Aucune tâche planifiée restante.';
 
     // 5. Activity Log (Timeline)

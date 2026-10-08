@@ -1,134 +1,184 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Plus, Minus, RotateCcw, AlertTriangle, ShieldCheck, MailWarning } from 'lucide-react';
+import { Mail, Plus, Minus, AlertTriangle, ShieldCheck, MailWarning, CheckCircle2 } from 'lucide-react';
 
 interface EmailInboxAlertProps {
   spaceId: string;
   spaceName?: string;
+  onCountChange?: (count: number) => void;
 }
 
-export const EmailInboxAlert: React.FC<EmailInboxAlertProps> = ({ spaceId, spaceName = 'Espace' }) => {
+export const EmailInboxAlert: React.FC<EmailInboxAlertProps> = ({
+  spaceId,
+  spaceName = 'Espace',
+  onCountChange,
+}) => {
+  const storageKey = `pmo_inbox_email_count_space_${spaceId}`;
+
   const [emailCount, setEmailCount] = useState<number>(() => {
     try {
-      const saved = localStorage.getItem(`pmo_inbox_email_count_space_${spaceId}`);
-      return saved ? Math.max(0, parseInt(saved, 10)) : 12; // Valeur par défaut réaliste
+      const saved = localStorage.getItem(storageKey);
+      return saved !== null ? Math.max(0, parseInt(saved, 10) || 0) : 0;
     } catch {
-      return 12;
+      return 0;
     }
   });
 
   // Recharger si spaceId change
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(`pmo_inbox_email_count_space_${spaceId}`);
-      setEmailCount(saved ? Math.max(0, parseInt(saved, 10)) : 12);
+      const saved = localStorage.getItem(storageKey);
+      const parsed = saved !== null ? Math.max(0, parseInt(saved, 10) || 0) : 0;
+      setEmailCount(parsed);
+      onCountChange?.(parsed);
     } catch {
-      setEmailCount(12);
+      setEmailCount(0);
     }
+  }, [spaceId, storageKey]);
+
+  // Synchroniser si modifié depuis un autre composant
+  useEffect(() => {
+    const handleSync = (e: Event) => {
+      const customEvent = e as CustomEvent<{ spaceId: string; count: number }>;
+      if (customEvent.detail && customEvent.detail.spaceId === spaceId) {
+        setEmailCount(customEvent.detail.count);
+      }
+    };
+    window.addEventListener('pmo-inbox-updated', handleSync);
+    return () => window.removeEventListener('pmo-inbox-updated', handleSync);
   }, [spaceId]);
 
   const updateCount = (newCount: number) => {
-    const val = Math.max(0, newCount);
+    const val = Math.max(0, isNaN(newCount) ? 0 : newCount);
     setEmailCount(val);
+    onCountChange?.(val);
     try {
-      localStorage.setItem(`pmo_inbox_email_count_space_${spaceId}`, String(val));
+      localStorage.setItem(storageKey, String(val));
+      window.dispatchEvent(
+        new CustomEvent('pmo-inbox-updated', { detail: { spaceId, count: val } })
+      );
     } catch (err) {
       console.error('Erreur stockage email count local:', err);
     }
   };
 
   // Déterminer les seuils
-  // Vert (Sain) : <= 50
-  // Jaune / Orange (Attention) : > 50
+  // 0 : Objectif Zero Inbox atteint
+  // Vert (Sain) : 1 à 50
+  // Jaune / Orange (Attention) : > 50 (51 à 100)
   // Rouge (Critique) : > 100
   let statusColor = 'bg-[#6B8E78]/10 text-[#4e634a] border-[#6B8E78]/25';
-  let badgeText = 'Sain';
+  let badgeText = emailCount === 0 ? 'Objectif 0 Email atteint' : 'Sain (≤ 50)';
   let badgeColor = 'bg-[#6B8E78] text-white';
-  let warningMessage = 'Triage efficace des e-mails. Aucun retard à déplorer sur les actions clients.';
-  let StatusIcon = ShieldCheck;
+  let warningMessage =
+    emailCount === 0
+      ? 'Félicitations ! Votre boîte de réception est à 0 email. Aucune action en attente.'
+      : 'Triage maîtrisé des e-mails (≤ 50). Aucun retard à déplorer sur les actions clients.';
+  let StatusIcon = emailCount === 0 ? CheckCircle2 : ShieldCheck;
 
   if (emailCount > 100) {
-    statusColor = 'bg-rose-50 text-rose-900 border-rose-200/60';
-    badgeText = 'Critique';
-    badgeColor = 'bg-rose-500 text-white';
-    warningMessage = "Boîte saturée : Risque élevé d'oubli d'actions prioritaires et de perte de réactivité.";
+    statusColor = 'bg-rose-50 text-rose-900 border-rose-200/80';
+    badgeText = 'Alerte Critique (> 100)';
+    badgeColor = 'bg-rose-600 text-white animate-pulse';
+    warningMessage = `Alerte Critique (${emailCount} e-mails > 100) : Boîte mail saturée ! Risque élevé d'oubli d'actions prioritaires et de perte de réactivité.`;
     StatusIcon = MailWarning;
   } else if (emailCount > 50) {
-    statusColor = 'bg-[#C89B7B]/10 text-[#966847] border-[#C89B7B]/25';
-    badgeText = 'Attention';
-    badgeColor = 'bg-[#C89B7B] text-white';
-    warningMessage = 'Risque de retard sur la création des tâches et le suivi des demandes clients.';
+    statusColor = 'bg-amber-50/90 text-amber-900 border-amber-200/80';
+    badgeText = 'Alerte (> 50)';
+    badgeColor = 'bg-amber-600 text-white';
+    warningMessage = `Attention (${emailCount} e-mails > 50) : Seuil de vigilance dépassé. Risque de retard sur la création des tâches et le suivi des demandes.`;
     StatusIcon = AlertTriangle;
   }
 
   return (
-    <div className={`rounded-2xl border p-5 transition-all duration-300 shadow-[0_2px_12px_rgba(0,0,0,0.01)] ${statusColor}`}>
+    <div
+      id="email-inbox-alert-widget"
+      className={`rounded-2xl border p-4 sm:p-5 transition-all duration-300 shadow-[0_2px_12px_rgba(0,0,0,0.01)] ${statusColor}`}
+    >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Infos & Alerte */}
         <div className="flex items-start gap-3.5">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/80 shadow-[0_2px_8px_rgba(0,0,0,0.02)] border border-[#F0EFEB]">
-            <Mail className="h-5 w-5 text-indigo-600/80" />
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/90 shadow-[0_2px_8px_rgba(0,0,0,0.02)] border border-[#F0EFEB]">
+            <Mail
+              className={`h-5 w-5 ${
+                emailCount > 100
+                  ? 'text-rose-600'
+                  : emailCount > 50
+                  ? 'text-amber-600'
+                  : 'text-[#6B8E78]'
+              }`}
+            />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h4 className="text-sm font-semibold tracking-wide text-[#1A1D1A]">
-                Santé Triage Mail • {spaceName}
+                Objectif 0 Email (Boîte de réception) • {spaceName}
               </h4>
-              <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${badgeColor}`}>
-                {badgeText}
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${badgeColor}`}
+              >
+                <StatusIcon className="h-3 w-3" />
+                <span>{badgeText}</span>
               </span>
             </div>
-            
+
             {/* Message dynamique basé sur le seuil */}
-            <p className="text-xs font-light mt-1 opacity-90 max-w-xl">
+            <p className="text-xs font-normal mt-1 opacity-90 max-w-2xl">
               {warningMessage}
             </p>
           </div>
         </div>
 
         {/* Compteur & Ajustements */}
-        <div className="flex flex-wrap items-center gap-3 bg-white/60 p-2.5 rounded-xl border border-white/50 backdrop-blur-sm self-start md:self-auto shrink-0">
-          <span className="text-xs text-[#737873] font-medium px-1">
-            Non classés :
-          </span>
+        <div className="flex flex-wrap items-center gap-2.5 bg-white/80 p-2 rounded-xl border border-[#F0EFEB] backdrop-blur-sm self-start md:self-auto shrink-0">
+          <label htmlFor={`inbox-count-input-${spaceId}`} className="text-xs text-[#737873] font-medium px-1">
+            Emails en boîte :
+          </label>
 
           <div className="flex items-center gap-1">
             <button
+              type="button"
               onClick={() => updateCount(emailCount - 5)}
-              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-[#F0EFEB] text-[#1A1D1A] hover:bg-slate-50 active:scale-95 transition-all"
+              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-[#F0EFEB] text-[#1A1D1A] hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
               title="-5 e-mails"
             >
               <Minus className="h-3 w-3" />
             </button>
-            
+
             <input
+              id={`inbox-count-input-${spaceId}`}
               type="number"
               min="0"
               value={emailCount}
-              onChange={(e) => updateCount(parseInt(e.target.value, 10) || 0)}
-              className="w-14 text-center text-xs font-bold bg-white border border-[#F0EFEB] rounded-lg py-1 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100"
+              onChange={(e) => {
+                const raw = e.target.value;
+                updateCount(raw === '' ? 0 : parseInt(raw, 10));
+              }}
+              className="w-16 text-center text-xs font-bold bg-white border border-[#F0EFEB] rounded-lg py-1 text-[#1A1D1A] focus:outline-none focus:border-[#6B8E78] focus:ring-1 focus:ring-[#6B8E78]/20"
             />
 
             <button
+              type="button"
               onClick={() => updateCount(emailCount + 5)}
-              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-[#F0EFEB] text-[#1A1D1A] hover:bg-slate-50 active:scale-95 transition-all"
+              className="flex h-7 w-7 items-center justify-center rounded-lg bg-white border border-[#F0EFEB] text-[#1A1D1A] hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
               title="+5 e-mails"
             >
               <Plus className="h-3 w-3" />
             </button>
           </div>
 
-          <div className="flex items-center gap-1.5 border-l border-[#F0EFEB]/80 pl-2">
+          <div className="flex items-center gap-1.5 border-l border-[#F0EFEB] pl-2">
             {emailCount > 0 ? (
               <button
+                type="button"
                 onClick={() => updateCount(0)}
-                className="inline-flex items-center gap-1 rounded-lg bg-[#6B8E78] hover:bg-[#5d7c68] text-white px-2.5 py-1 text-[11px] font-medium active:scale-[0.98] transition-all"
-                title="Déclarer la boîte mail totalement triée !"
+                className="inline-flex items-center gap-1 rounded-lg bg-[#6B8E78] hover:bg-[#5d7c68] text-white px-2.5 py-1 text-[11px] font-medium active:scale-[0.98] transition-all cursor-pointer"
+                title="Réinitialiser à 0 email (Zero Inbox)"
               >
-                Zero Inbox 🎉
+                0 Email 🎉
               </button>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#6B8E78] px-1 py-1">
-                Boîte propre ! ✨
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#6B8E78] px-1.5 py-0.5">
+                Zero Inbox ✨
               </span>
             )}
           </div>
@@ -137,3 +187,4 @@ export const EmailInboxAlert: React.FC<EmailInboxAlertProps> = ({ spaceId, space
     </div>
   );
 };
+

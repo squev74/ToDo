@@ -507,7 +507,7 @@ export function validateImportData(
 
 // Vérifie si une tâche est en retard
 export function isTaskOverdue(task: Tache): boolean {
-  if (task.statut === 'Done') return false;
+  if (task.statut === 'Done' || task.statut === 'Cancelled') return false;
   if (!task.dateEcheance) return false;
 
   const today = getTodayDateString();

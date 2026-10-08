@@ -12,7 +12,8 @@ import {
   Sparkles, 
   TrendingUp, 
   Activity, 
-  Folder 
+  Folder,
+  Mail
 } from 'lucide-react';
 import { PmoAlert } from '../utils/pmoHealthCheck';
 
@@ -38,7 +39,7 @@ export const GlobalPmoAttentionWidget: React.FC<GlobalPmoAttentionWidgetProps> =
     }
   }, [alerts.length]);
   const [activeSeverityFilter, setActiveSeverityFilter] = useState<'all' | 'critical' | 'warning' | 'info'>('all');
-  const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'timesheet' | 'delay' | 'stagnant' | 'capacity' | 'raid' | 'deliverable'>('all');
+  const [activeCategoryFilter, setActiveCategoryFilter] = useState<'all' | 'timesheet' | 'delay' | 'stagnant' | 'capacity' | 'raid' | 'deliverable' | 'inbox'>('all');
 
   // Comptages rapides
   const stats = useMemo(() => {
@@ -95,6 +96,7 @@ export const GlobalPmoAttentionWidget: React.FC<GlobalPmoAttentionWidgetProps> =
       case 'capacity': return TrendingUp;
       case 'raid': return AlertOctagon;
       case 'deliverable': return Folder;
+      case 'inbox': return Mail;
     }
   };
 
@@ -108,6 +110,8 @@ export const GlobalPmoAttentionWidget: React.FC<GlobalPmoAttentionWidgetProps> =
         onNavigateToTab('timesheet');
       } else if (alert.actionTab === 'tasks') {
         onNavigateToTab('tasks');
+      } else if (alert.actionTab === 'report') {
+        onNavigateToTab('report');
       }
     }
   };
@@ -223,6 +227,7 @@ export const GlobalPmoAttentionWidget: React.FC<GlobalPmoAttentionWidgetProps> =
                   className="rounded-xl border border-[#EAE8E2] bg-[#FAF9F6] px-2.5 py-1 text-[10px] text-[#737873] focus:border-[#6B8E78] focus:outline-none"
                 >
                   <option value="all">Toutes catégories</option>
+                  <option value="inbox">Boîte mail (0 Email)</option>
                   <option value="timesheet">Feuille de temps</option>
                   <option value="delay">Tâches en retard</option>
                   <option value="stagnant">Tâches stagnantes</option>
